@@ -6,14 +6,17 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const filters = Object.fromEntries(searchParams.entries());
 
-    const response = await fetch(`${environment.API_BASE_URL}/products`, {
+    const apiUrl = new URL(`${environment.API_BASE_URL}/products`);
+    // Add filters as query parameters
+    Object.entries(filters).forEach(([key, value]) => {
+      apiUrl.searchParams.append(key, value);
+    });
+
+    const response = await fetch(apiUrl.toString(), {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
       },
-      ...(Object.keys(filters).length > 0 && {
-        body: JSON.stringify(filters),
-      }),
     });
 
     if (!response.ok) {
