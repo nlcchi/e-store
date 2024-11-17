@@ -4,8 +4,9 @@ import { environment } from '../config/environment';
 import { ApiService } from './api.service';
 
 interface AuthTokens {
-  accessToken: string;
-  refreshToken: string;
+  AccessToken: string;
+  IdToken: string;
+  RefreshToken: string;
 }
 
 interface UserClaims {
@@ -37,19 +38,55 @@ export class AuthService {
     return AuthService.instance;
   }
 
+  public async register(
+    username: string,
+    email: string,
+    password: string,
+    gender: string
+  ): Promise<void> {
+    try {
+      await this.apiService.register({
+        username: username.toLowerCase(),
+        email: email.toLowerCase(),
+        password,
+        gender: gender.toLowerCase(),
+      });
+    } catch (error) {
+      console.error('Registration failed:', error);
+      if (error instanceof Error) {
+        if (error.message.includes('UsernameExistsException')) {
+          throw new AuthError('Username already exists');
+        } else if (error.message.includes('EmailExistsException')) {
+          throw new AuthError('Email already exists');
+        } else if (error.message.includes('InvalidPasswordException')) {
+          throw new AuthError(
+            'Password must be at least 6 characters long and contain uppercase, lowercase, numbers, and special characters'
+          );
+        }
+      }
+      throw new AuthError(
+        error instanceof Error ? error.message : 'Registration failed',
+        'REGISTRATION_FAILED'
+      );
+    }
+  }
+
   public async login(email: string, password: string): Promise<void> {
     try {
-      const response = await this.apiService.login({ email, password });
-      if (!this.validateTokenResponse(response)) {
+      console.log('Attempting login with:', { username: email });
+      const response = await this.apiService.login({ 
+        username: email, // Use email as username
+        password 
+      });
+      
+      if (!this.validateTokenResponse(response.tokens)) {
         throw new AuthError('Invalid token response from server');
       }
-      this.setTokens(response);
+      this.setTokens(response.tokens);
     } catch (error) {
       console.error('Login failed:', error);
-      throw new AuthError(
-        error instanceof Error ? error.message : 'Login failed',
-        'LOGIN_FAILED'
-      );
+      const message = error instanceof Error ? error.message : 'Login failed';
+      throw new AuthError(message, 'LOGIN_FAILED');
     }
   }
 
@@ -65,7 +102,7 @@ export class AuthService {
 
   public async refreshTokens(): Promise<void> {
     try {
-      const refreshToken = localStorage.getItem('refreshToken');
+      const refreshToken = localStorage.getItem('RefreshToken');
       if (!refreshToken) {
         throw new AuthError('No refresh token available', 'NO_REFRESH_TOKEN');
       }
@@ -85,14 +122,16 @@ export class AuthService {
     }
   }
 
-  private validateTokenResponse(response: unknown): response is AuthTokens {
+  private validateTokenResponse(tokens: unknown): tokens is AuthTokens {
     return (
-      typeof response === 'object' &&
-      response !== null &&
-      'accessToken' in response &&
-      'refreshToken' in response &&
-      typeof response.accessToken === 'string' &&
-      typeof response.refreshToken === 'string'
+      typeof tokens === 'object' &&
+      tokens !== null &&
+      'AccessToken' in tokens &&
+      'IdToken' in tokens &&
+      'RefreshToken' in tokens &&
+      typeof tokens.AccessToken === 'string' &&
+      typeof tokens.IdToken === 'string' &&
+      typeof tokens.RefreshToken === 'string'
     );
   }
 
@@ -114,7 +153,7 @@ export class AuthService {
   }
 
   public getAccessToken(): string | null {
-    const token = localStorage.getItem('accessToken');
+    const token = localStorage.getItem('AccessToken');
     if (!token) return null;
 
     const claims = this.parseToken(token);
@@ -131,7 +170,7 @@ export class AuthService {
   }
 
   public getUserGroup(): string[] {
-    const token = this.getAccessToken();
+    const token = localStorage.getItem('IdToken');
     if (!token) return [];
 
     const claims = this.parseToken(token);
@@ -152,12 +191,14 @@ export class AuthService {
   }
 
   private setTokens(tokens: AuthTokens): void {
-    localStorage.setItem('accessToken', tokens.accessToken);
-    localStorage.setItem('refreshToken', tokens.refreshToken);
+    localStorage.setItem('AccessToken', tokens.AccessToken);
+    localStorage.setItem('IdToken', tokens.IdToken);
+    localStorage.setItem('RefreshToken', tokens.RefreshToken);
   }
 
   private clearTokens(): void {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('AccessToken');
+    localStorage.removeItem('IdToken');
+    localStorage.removeItem('RefreshToken');
   }
 }

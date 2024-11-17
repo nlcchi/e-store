@@ -3,6 +3,7 @@ import {
   BucketEncryption,
   HttpMethods,
   StorageClass,
+  BlockPublicAccess,
 } from 'aws-cdk-lib/aws-s3';
 import {RemovalPolicy, Duration} from 'aws-cdk-lib';
 import {Construct} from 'constructs';
@@ -23,6 +24,7 @@ export class S3 extends Construct {
       autoDeleteObjects: true,
       versioned: false,
       publicReadAccess: true,
+      blockPublicAccess: BlockPublicAccess.BLOCK_ACLS,
       encryption: BucketEncryption.S3_MANAGED,
       cors: [
         {

@@ -9,6 +9,10 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useRouter } from "next/navigation";
+import { ApiService } from "@/services/api.service";
+import { useState } from "react";
+import { toast } from "sonner";
+import { ProtectedRoute } from "@/components/auth/protected-route";
 
 const checkoutSchema = z.object({
   email: z.string().email(),
@@ -24,6 +28,8 @@ type CheckoutForm = z.infer<typeof checkoutSchema>;
 export default function CheckoutPage() {
   const { state } = useCart();
   const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
+  const apiService = ApiService.getInstance();
 
   const {
     register,
@@ -34,121 +40,154 @@ export default function CheckoutPage() {
   });
 
   const onSubmit = async (data: CheckoutForm) => {
-    // Here you would typically send the order to your backend
-    console.log("Order submitted:", { ...data, items: state.items });
-    // Redirect to success page
-    router.push("/checkout/success");
+    try {
+      setIsLoading(true);
+      
+      // Initiate checkout with the API
+      const { clientSecret } = await apiService.initiateCheckout({
+        location: {
+          address: `${data.address}, ${data.city}, ${data.postalCode}`,
+          country: data.country,
+        },
+      });
+
+      // Here you would typically handle the payment with Stripe or another payment provider
+      // using the clientSecret
+
+      // For now, we'll just redirect to success
+      router.push("/checkout/success");
+    } catch (error) {
+      console.error("Checkout failed:", error);
+      toast.error("Failed to process checkout. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (state.items.length === 0) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold mb-4">Your cart is empty</h1>
-        <Button onClick={() => router.push("/")}>Continue Shopping</Button>
-      </div>
+      <ProtectedRoute>
+        <div className="container mx-auto px-4 py-8">
+          <h1 className="text-2xl font-bold mb-4">Your cart is empty</h1>
+          <Button onClick={() => router.push("/")}>Continue Shopping</Button>
+        </div>
+      </ProtectedRoute>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-8">Checkout</h1>
-      <div className="grid md:grid-cols-2 gap-8">
-        <div className="space-y-6">
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                {...register("email")}
-              />
-              {errors.email && (
-                <p className="text-sm text-red-500">{errors.email.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
-              <Input
-                id="name"
-                {...register("name")}
-              />
-              {errors.name && (
-                <p className="text-sm text-red-500">{errors.name.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="address">Address</Label>
-              <Input
-                id="address"
-                {...register("address")}
-              />
-              {errors.address && (
-                <p className="text-sm text-red-500">{errors.address.message}</p>
-              )}
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
+    <ProtectedRoute>
+      <div className="container mx-auto px-4 py-8">
+        <h1 className="text-2xl font-bold mb-8">Checkout</h1>
+        <div className="grid md:grid-cols-2 gap-8">
+          <div className="space-y-6">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="city">City</Label>
+                <Label htmlFor="email">Email</Label>
                 <Input
-                  id="city"
-                  {...register("city")}
+                  id="email"
+                  type="email"
+                  disabled={isLoading}
+                  {...register("email")}
                 />
-                {errors.city && (
-                  <p className="text-sm text-red-500">{errors.city.message}</p>
+                {errors.email && (
+                  <p className="text-sm text-red-500">{errors.email.message}</p>
                 )}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="postalCode">Postal Code</Label>
+                <Label htmlFor="name">Full Name</Label>
                 <Input
-                  id="postalCode"
-                  {...register("postalCode")}
+                  id="name"
+                  disabled={isLoading}
+                  {...register("name")}
                 />
-                {errors.postalCode && (
-                  <p className="text-sm text-red-500">{errors.postalCode.message}</p>
+                {errors.name && (
+                  <p className="text-sm text-red-500">{errors.name.message}</p>
                 )}
               </div>
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="country">Country</Label>
-              <Input
-                id="country"
-                {...register("country")}
-              />
-              {errors.country && (
-                <p className="text-sm text-red-500">{errors.country.message}</p>
-              )}
-            </div>
-
-            <Button type="submit" className="w-full" size="lg">
-              Place Order
-            </Button>
-          </form>
-        </div>
-
-        <div className="space-y-6">
-          <div className="bg-accent/50 rounded-lg p-6">
-            <h2 className="text-lg font-semibold mb-4">Order Summary</h2>
-            {state.items.map((item) => (
-              <div key={item.id} className="flex justify-between py-2">
-                <span>
-                  {item.name} x {item.quantity}
-                </span>
-                <span>${(item.price * item.quantity).toFixed(2)}</span>
+              <div className="space-y-2">
+                <Label htmlFor="address">Address</Label>
+                <Input
+                  id="address"
+                  disabled={isLoading}
+                  {...register("address")}
+                />
+                {errors.address && (
+                  <p className="text-sm text-red-500">{errors.address.message}</p>
+                )}
               </div>
-            ))}
-            <Separator className="my-4" />
-            <div className="flex justify-between font-semibold">
-              <span>Total</span>
-              <span>${state.total.toFixed(2)}</span>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="city">City</Label>
+                  <Input
+                    id="city"
+                    disabled={isLoading}
+                    {...register("city")}
+                  />
+                  {errors.city && (
+                    <p className="text-sm text-red-500">{errors.city.message}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="postalCode">Postal Code</Label>
+                  <Input
+                    id="postalCode"
+                    disabled={isLoading}
+                    {...register("postalCode")}
+                  />
+                  {errors.postalCode && (
+                    <p className="text-sm text-red-500">{errors.postalCode.message}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="country">Country</Label>
+                <Input
+                  id="country"
+                  disabled={isLoading}
+                  {...register("country")}
+                />
+                {errors.country && (
+                  <p className="text-sm text-red-500">{errors.country.message}</p>
+                )}
+              </div>
+
+              <Button 
+                type="submit" 
+                className="w-full" 
+                size="lg"
+                disabled={isLoading}
+              >
+                {isLoading ? "Processing..." : "Place Order"}
+              </Button>
+            </form>
+          </div>
+
+          <div className="space-y-6">
+            <div className="bg-accent/50 rounded-lg p-6">
+              <h2 className="text-lg font-semibold mb-4">Order Summary</h2>
+              {state.items.map((item) => (
+                <div key={item.id} className="flex justify-between py-2">
+                  <span>
+                    {item.name} x {item.quantity}
+                  </span>
+                  <span>${(item.price * item.quantity).toFixed(2)}</span>
+                </div>
+              ))}
+              <Separator className="my-4" />
+              <div className="flex justify-between font-semibold">
+                <span>Total</span>
+                <span>${state.total.toFixed(2)}</span>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </ProtectedRoute>
   );
 }

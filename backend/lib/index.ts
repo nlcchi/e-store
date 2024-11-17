@@ -6,6 +6,7 @@ import {UserGroups} from './userGroups';
 import {IdentityManagement} from './identityManagement';
 import {S3} from './s3';
 import {ApiGateway} from './apiGateway';
+import {CloudWatchDashboard} from './cloudwatch';
 
 export class CdkStack extends Stack {
   constructor(scope: App, id: string, props?: StackProps) {
@@ -26,17 +27,17 @@ export class CdkStack extends Stack {
     const awsLambdaBasicExecutionRole = AWSLambdaBasicExecutionRole();
     const amazonCognitoPowerUser = AmazonCognitoPowerUser();
 
-    // 👇 create the cognito pools
+    // create the cognito pools
     const {userPool, userPoolClient} = new Cognito(this, 'Cognito');
-    // 👇 create the apigateway
+    // create the apigateway
     const {httpApi} = new ApiGateway(this, 'ApiGateway');
-    // 👇 create the identity pools
+    // create the identity pools
     const {identityPools} = new UserGroups(this, 'UserGroups', {
       amazonCognitoPowerUser,
       userPool,
       userPoolClient,
     });
-    // 👇 create the environment variables
+    // create the environment variables
     const environment = {
       userPoolId: userPool.userPoolId,
       userPoolClientId: userPoolClient.userPoolClientId,
@@ -44,11 +45,11 @@ export class CdkStack extends Stack {
       providerName: userPool.userPoolProviderName,
       ...identityPools,
     };
-    // 👇 create the database
+    // create the database
     new Database(this, 'Database');
-    // 👇 create the product images bucket
+    // create the product images bucket
     const {productBucket} = new S3(this, 'S3');
-    // 👇 create the microservice
+    // create the microservice
     new Microservice(this, 'Microservice', {
       httpApi,
       environment,
@@ -61,7 +62,10 @@ export class CdkStack extends Stack {
       // authorizer,
     });
 
-    // 👇 cdk exports
+    // create the CloudWatch dashboard
+    new CloudWatchDashboard(this, 'CloudWatchDashboard');
+
+    // cdk exports
     new CfnOutput(this, 'accountId', {value: Stack.of(this).account});
     new CfnOutput(this, 'region', {value: Stack.of(this).region});
     new CfnOutput(this, 'availabilityZones', {
