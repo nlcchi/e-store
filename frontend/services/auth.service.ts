@@ -45,6 +45,13 @@ export class AuthService {
     gender: string
   ): Promise<void> {
     try {
+      console.log('Registering user:', {
+        username: username.toLowerCase(),
+        email: email.toLowerCase(),
+        gender: gender.toLowerCase(),
+        password: '[REDACTED]'
+      });
+
       await this.apiService.register({
         username: username.toLowerCase(),
         email: email.toLowerCase(),
@@ -52,20 +59,36 @@ export class AuthService {
         gender: gender.toLowerCase(),
       });
     } catch (error) {
-      console.error('Registration failed:', error);
-      if (error instanceof Error) {
-        if (error.message.includes('UsernameExistsException')) {
+      console.error('Registration failed:', {
+        error,
+        isError: error instanceof Error,
+        errorType: error?.constructor?.name,
+        errorProps: Object.getOwnPropertyNames(error || {}),
+      });
+      
+      // Handle specific API errors
+      if (error && typeof error === 'object' && 'message' in error) {
+        const message = String(error.message).toLowerCase();
+        
+        if (message.includes('username exists')) {
           throw new AuthError('Username already exists');
-        } else if (error.message.includes('EmailExistsException')) {
+        } else if (message.includes('email exists')) {
           throw new AuthError('Email already exists');
-        } else if (error.message.includes('InvalidPasswordException')) {
+        } else if (message.includes('invalid password')) {
           throw new AuthError(
             'Password must be at least 6 characters long and contain uppercase, lowercase, numbers, and special characters'
           );
+        } else if (message.includes('invalid parameter')) {
+          throw new AuthError('Invalid parameters. Please check your input.');
+        } else {
+          // Pass through the API error message
+          throw new AuthError(error.message);
         }
       }
+
+      // Handle unknown errors
       throw new AuthError(
-        error instanceof Error ? error.message : 'Registration failed',
+        'Registration failed. Please try again later.',
         'REGISTRATION_FAILED'
       );
     }

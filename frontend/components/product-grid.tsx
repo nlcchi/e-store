@@ -71,7 +71,7 @@ export default function ProductGrid({ initialProducts = [], filters }: ProductGr
         id: product.id,
         name: product.name,
         price: product.price,
-        image: product.image_1 ? `/images/products/${product.id}_1.jpg` : '',
+        image: product.image_1 ? `/images/products/${product.id}_1.jpg` : '/images/placeholder.jpg',
       },
     });
     toast({
@@ -126,7 +126,7 @@ export default function ProductGrid({ initialProducts = [], filters }: ProductGr
           <div className="relative h-48 bg-gray-100 rounded-t-lg">
             {product.image_1 ? (
               <Image
-                src={`/images/products/${product.id}_1.jpg`}
+                src={product.image_1 ? `/images/products/${product.id}_1.jpg` : '/images/placeholder.jpg'}
                 alt={product.name}
                 fill
                 className="object-cover rounded-t-lg"

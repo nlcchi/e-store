@@ -75,30 +75,74 @@ export class ApiService {
       if (contentType && contentType.includes('application/json')) {
         data = await response.json();
       } else {
-        data = await response.text();
+        const text = await response.text();
+        try {
+          // Try to parse the text as JSON even if content-type is not set
+          data = JSON.parse(text);
+        } catch {
+          data = text;
+        }
       }
 
       console.log('Response:', {
         status: response.status,
         statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
         data,
       });
 
       if (!response.ok) {
+        let errorMessage = 'An error occurred';
+        let errorCode = undefined;
+
+        if (typeof data === 'object' && data !== null) {
+          // Handle AWS API Gateway error format
+          if ('message' in data) {
+            errorMessage = data.message;
+          } else if ('Message' in data) {
+            errorMessage = data.Message;
+          }
+          
+          if ('code' in data) {
+            errorCode = data.code;
+          } else if ('Code' in data) {
+            errorCode = data.Code;
+          }
+        } else if (typeof data === 'string' && data.length > 0) {
+          errorMessage = data;
+        }
+
         const error: ApiError = {
-          message: data?.message || response.statusText || 'An error occurred',
-          code: data?.code,
+          message: errorMessage,
+          code: errorCode,
         };
+        
         throw error;
       }
 
       return data;
     } catch (error) {
-      console.error('API request failed:', error);
+      console.error('API request failed:', {
+        error,
+        isError: error instanceof Error,
+        errorType: error?.constructor?.name,
+        errorProps: Object.getOwnPropertyNames(error || {}),
+      });
+
       if (error instanceof TypeError && error.message === 'Failed to fetch') {
         throw new Error('Network error: Please check your internet connection');
       }
-      throw error;
+
+      // If it's already an ApiError, rethrow it
+      if (error && typeof error === 'object' && 'message' in error) {
+        throw error;
+      }
+
+      // Otherwise, wrap it in an ApiError
+      throw {
+        message: error instanceof Error ? error.message : 'An unexpected error occurred',
+        code: 'UNKNOWN_ERROR'
+      };
     }
   }
 

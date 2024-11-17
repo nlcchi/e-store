@@ -32,7 +32,7 @@ export default function Navbar() {
           </Button>
           <Link href="/" className="flex items-center space-x-2">
             <ShoppingCart className="h-6 w-6" />
-            <span className="text-xl font-bold">ModernShop</span>
+            <span className="text-xl font-bold">Cara</span>
           </Link>
         </div>
 
