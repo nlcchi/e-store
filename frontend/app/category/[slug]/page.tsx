@@ -1,3 +1,4 @@
+import axios from "axios";
 import { notFound } from "next/navigation";
 import ProductGrid from "@/components/product-grid";
 import { environment } from '@/config/environment';
@@ -24,27 +25,21 @@ export function generateStaticParams() {
 
 async function getCategoryProducts(category: string): Promise<Product[]> {
   try {
-    const response = await fetch(`${environment.API_BASE_URL}/v1/products`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+    const response = await axios.post(`${environment.API_BASE_URL}/v1/products`, null, {
+      params: {
         category: category
           .split("-")
           .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-          .join(" ")
+          .join(" & ")
           .replace('And', '&'),
-      }),
-      next: { revalidate: 3600 }, // Cache for 1 hour
+      },
+      headers: {
+        'Content-Type': 'application/json',
+      },
     });
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch products: ${response.statusText}`);
-    }
+    const data = response.data;
 
-    const data = await response.json();
-    
     if (!data.queryResult || !Array.isArray(data.queryResult)) {
       console.error('Invalid products response format');
       return [];
