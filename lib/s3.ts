@@ -16,13 +16,13 @@ export class S3 extends Construct {
 
     const {productImages} = S3Constants;
 
-    // 👇 create the bucket for images
+    // create the bucket for images
     this.productBucket = new Bucket(this, productImages, {
       bucketName: productImages,
       removalPolicy: RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
       versioned: false,
-      publicReadAccess: false,
+      publicReadAccess: true,
       encryption: BucketEncryption.S3_MANAGED,
       cors: [
         {
