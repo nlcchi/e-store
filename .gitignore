@@ -74,7 +74,6 @@ typings/
 # DynamoDB Local files
 .dynamodb/
 
-
 infra/*.js
 *.d.ts
 !environment.d.ts
@@ -91,3 +90,52 @@ env.ts
 
 cdk-outputs.json
 cdk.context.json
+
+# TypeScript build output
+dist/
+build/
+*.js
+!jest.config.js
+*.d.ts
+!environment.d.ts
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# macOS system files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# AWS CDK specific
+*.js.map
+cdk.out/
+.cdk.staging/
+cdk-outputs*.json
+cdk.context.json
+.aws-sam/
+
+# Test coverage
+coverage/
+.nyc_output/
+test-report/
+
+# Temporary files
+*.tmp
+*.temp
+.env*
+!.env.example
+
+# Keep these files
+!.gitignore
+!.npmignore
+!jest.config.js
+!.eslintrc.js
+!.prettierrc.js
+!tsconfig.json

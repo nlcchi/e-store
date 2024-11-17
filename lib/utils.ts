@@ -406,7 +406,7 @@ export const constants = {
   },
 };
 export const S3Constants = {
-  productImages: 'bucket-product-images',
+  productImages: `bucket-product-images-${Date.now()}`,
 };
 export const tokenDomain = '.e-store.gq';
 const tokenParams = [
