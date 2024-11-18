@@ -43,3 +43,20 @@ yarn-error.log*
 *.tmp
 *.temp
 .cache/
+
+# Terraform specific
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+.terraform.lock.hcl
+terraform.tfstate.backup
+terraform.tfstate.d/
+.terraformrc
+terraform.rc
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+crash.log
+crash.*.log
