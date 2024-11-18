@@ -1,5 +1,12 @@
 {
   "app": "npx ts-node --prefer-ts-exts bin/index.ts",
-  "context": {},
-  "watch": "./"
+  "context": {
+    "region": "ap-southeast-1",
+    "environment": "production",
+    "@aws-cdk/aws-apigateway:usagePlanKeyOrderInsensitiveId": true,
+    "@aws-cdk/aws-lambda:recognizeVersionProps": true,
+    "@aws-cdk/aws-cloudfront:defaultSecurityPolicyTLSv1.2_2021": true
+  },
+  "watch": "./",
+  "versionReporting": false
 }

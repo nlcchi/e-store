@@ -17,7 +17,7 @@ export class CloudWatchDashboard extends Construct {
 
     // Create the dashboard
     const dashboard = new Dashboard(this, 'EStoreDashboard', {
-      dashboardName: 'E-Store-Dashboard'
+      dashboardName: `E-Store-Dashboard-${scope.node.tryGetContext('region') || 'ap-southeast-1'}`
     });
 
     // API Gateway Metrics

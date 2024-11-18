@@ -1,7 +1,7 @@
 variable "aws_region" {
   description = "AWS region for all resources"
   type        = string
-  default     = "us-east-1"
+  default     = "ap-southeast-1"  # Singapore region
 }
 
 variable "environment" {
@@ -19,7 +19,7 @@ variable "project_name" {
 variable "allowed_origins" {
   description = "List of allowed origins for CORS"
   type        = list(string)
-  default     = ["http://localhost:3000", "https://your-domain.com"]
+  default     = ["http://localhost:3000", "https://ap.your-domain.com"] 
 }
 
 variable "dynamodb_point_in_time_recovery" {
@@ -52,7 +52,20 @@ variable "lambda_environment_variables" {
   default     = {
     NODE_ENV     = "production"
     API_VERSION  = "v1"
-    REGION       = "us-east-1"
+    REGION       = "ap-southeast-1"
     PROJECT_NAME = "e-store"
+    TIMEZONE     = "Asia/Singapore"
   }
+}
+
+variable "cloudfront_price_class" {
+  description = "CloudFront distribution price class"
+  type        = string
+  default     = "PriceClass_200"  
+}
+
+variable "dynamodb_replica_regions" {
+  description = "Regions for DynamoDB global tables"
+  type        = list(string)
+  default     = ["ap-southeast-1", "ap-east-1", "ap-south-1"]  
 }

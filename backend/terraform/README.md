@@ -42,6 +42,28 @@ Currently configured:
   - Order processing logs
   - Error monitoring logs
 
+## Deployed Infrastructure Components
+
+The following AWS resources were successfully deployed and managed:
+
+- **API Gateway**: HTTP API for handling all backend requests
+- **Lambda Functions**: Serverless compute for various microservices
+  - User management
+  - Product management
+  - Order processing
+  - Payment processing
+- **DynamoDB Tables**: NoSQL database for storing:
+  - User data
+  - Products
+  - Orders
+  - Shopping carts
+- **Cognito**: User authentication and authorization
+- **S3 Buckets**: Storage for product images and assets
+- **IAM Roles**: Necessary permissions for all components
+- **CloudWatch**: Monitoring and logging
+
+Note: This infrastructure has been decommissioned using `terraform destroy` but the configuration is preserved for documentation and future reference.
+
 ## Variables
 
 | Name | Description | Default |
