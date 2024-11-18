@@ -13,6 +13,7 @@ import {
   Moon,
   Menu,
   LogOut,
+  ShieldCheck,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -23,11 +24,25 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { CartSheet } from "@/components/cart-sheet";
 import { useAuth } from "@/lib/auth-context";
+import { AuthService } from "@/services/auth.service";
 
 export default function Navbar() {
   const { setTheme, theme } = useTheme();
   const router = useRouter();
   const { isAuthenticated, username, logout } = useAuth();
+  const authService = AuthService.getInstance();
+
+  const hasAdminAccess = isAuthenticated && (authService.isAdmin() || authService.canManageProducts());
+
+  // Debug information
+  console.log('Auth Debug:', {
+    isAuthenticated,
+    username,
+    userGroups: authService.getUserGroup(),
+    hasAdminAccess,
+    isAdmin: authService.isAdmin(),
+    canManageProducts: authService.canManageProducts()
+  });
 
   const handleUserClick = () => {
     if (!isAuthenticated) {
@@ -117,6 +132,12 @@ export default function Navbar() {
                   <ShoppingCart className="mr-2 h-4 w-4" />
                   Orders
                 </DropdownMenuItem>
+                {hasAdminAccess && (
+                  <DropdownMenuItem onClick={() => router.push('/admin')}>
+                    <ShieldCheck className="mr-2 h-4 w-4" />
+                    Admin Dashboard
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={logout}>
                   <LogOut className="mr-2 h-4 w-4" />

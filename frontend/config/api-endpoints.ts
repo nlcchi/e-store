@@ -21,7 +21,7 @@ export const API_ENDPOINTS = {
     PROCESS_INTENT: (intent: string) => `/v1/order/${intent}`
   },
   PAYMENT: {
-    CHECKOUT: '/payment/checkout'
+    CHECKOUT: '/v1/payment/checkout'
   },
   GENERAL: {
     COUNTRIES: '/country',

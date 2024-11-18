@@ -227,5 +227,18 @@ export class ApiService {
     });
   }
 
+  // Payment endpoints
+  public async initiateCheckout(data: { 
+    orders: Array<{ productId: string; count: number }>;
+    location: { country: string; address: string };
+  }): Promise<{ url: string }> {
+    return this.request(API_ENDPOINTS.PAYMENT.CHECKOUT, {
+      method: 'POST',
+      body: JSON.stringify(data),
+      credentials: 'include',
+      requiresAuth: true
+    });
+  }
+
   // Add other API methods as needed
 }

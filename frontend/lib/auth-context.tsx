@@ -1,8 +1,9 @@
 'use client';
 
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { AuthService } from '@/services/auth.service';
+import { environment } from '@/config/environment';
 import { toast } from 'sonner';
 
 interface AuthContextType {
@@ -20,10 +21,45 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [username, setUsername] = useState<string | null>(null);
   const router = useRouter();
   const authService = AuthService.getInstance();
+
+  // Check authentication status on mount
+  useEffect(() => {
+    const checkAuth = () => {
+      try {
+        const tokens = authService.getTokens();
+        if (tokens?.IdToken) {
+          const claims = authService.parseToken(tokens.IdToken);
+          if (claims) {
+            setIsAuthenticated(true);
+            setUsername(claims.email);
+            
+            // Check if user has admin access
+            const userGroups = authService.getUserGroup();
+            const isAdmin = userGroups.includes(environment.COGNITO.USER_GROUPS.ADMIN);
+            const canManageProducts = userGroups.includes(environment.COGNITO.USER_GROUPS.MANAGE_PRODUCT);
+            
+            console.log('Auth state initialized:', {
+              isAuthenticated: true,
+              email: claims.email,
+              groups: userGroups,
+              isAdmin,
+              canManageProducts
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error checking auth state:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    checkAuth();
+  }, []);
 
   const register = useCallback(
     async (username: string, email: string, password: string, gender: string) => {
@@ -75,10 +111,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (email: string, password: string) => {
       setIsLoading(true);
       try {
-        await authService.login(email, password);
+        const userClaims = await authService.login(email, password);
         setIsAuthenticated(true);
+        setUsername(userClaims.email);
         toast.success('Login successful!');
-        router.push('/');
+        
+        // Check if user has admin access
+        const userGroups = authService.getUserGroup();
+        const isAdmin = userGroups.includes(environment.COGNITO.USER_GROUPS.ADMIN);
+        const canManageProducts = userGroups.includes(environment.COGNITO.USER_GROUPS.MANAGE_PRODUCT);
+        
+        // Redirect based on user role
+        if (isAdmin || canManageProducts) {
+          router.push('/admin');
+        } else {
+          router.push('/');
+        }
       } catch (error) {
         console.error('Login error:', error);
         if (error instanceof Error) {

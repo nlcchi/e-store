@@ -198,18 +198,48 @@ export class AuthService {
     }
   }
 
-  public async login(email: string, password: string): Promise<void> {
+  public async login(email: string, password: string): Promise<UserClaims> {
     try {
       console.log('Attempting login with:', { identity: email });
       const response = await this.apiService.login({ 
-        identity: email, // Backend expects 'identity' instead of 'username'
+        identity: email,
         password 
       });
       
+      console.log('Login response:', {
+        hasTokens: !!response.tokens,
+        tokenKeys: response.tokens ? Object.keys(response.tokens) : [],
+      });
+
       if (!this.validateTokenResponse(response.tokens)) {
+        console.error('Invalid token response:', response.tokens);
         throw new AuthError('Invalid token response from server');
       }
+
+      // Parse and log token information before storing
+      const idTokenClaims = this.parseToken(response.tokens.IdToken);
+      if (!idTokenClaims) {
+        throw new AuthError('Failed to parse ID token');
+      }
+
+      console.log('Token claims:', {
+        sub: idTokenClaims.sub,
+        groups: idTokenClaims.groups,
+        exp: idTokenClaims.exp
+      });
+
       this.setTokens(response.tokens);
+      
+      // Verify tokens were stored
+      const storedTokens = this.getTokens();
+      console.log('Stored tokens verification:', {
+        hasAccessToken: !!storedTokens?.AccessToken,
+        hasIdToken: !!storedTokens?.IdToken,
+        hasRefreshToken: !!storedTokens?.RefreshToken,
+        groups: this.getUserGroup()
+      });
+
+      return idTokenClaims;
     } catch (error) {
       console.error('Login failed:', error);
       const message = error instanceof Error ? error.message : 'Login failed';
@@ -405,7 +435,19 @@ export class AuthService {
           .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
           .join('')
       );
-      return JSON.parse(jsonPayload);
+      
+      const parsedPayload = JSON.parse(jsonPayload);
+      console.log('Full token payload:', parsedPayload);
+      
+      // Use the correct Cognito group claim name
+      const groups = parsedPayload['cognito:groups'] || [];
+                    
+      return {
+        sub: parsedPayload.sub,
+        email: parsedPayload.email,
+        groups: groups,
+        exp: parsedPayload.exp
+      };
     } catch (error) {
       console.error('Failed to parse token:', error);
       return null;
@@ -438,6 +480,7 @@ export class AuthService {
     if (!token) return [];
 
     const claims = this.parseToken(token);
+    console.log('getUserGroup claims:', claims);
     return claims?.groups || [];
   }
 

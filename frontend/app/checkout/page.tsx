@@ -43,19 +43,29 @@ export default function CheckoutPage() {
     try {
       setIsLoading(true);
       
-      // Initiate checkout with the API
-      const { clientSecret } = await apiService.initiateCheckout({
+      // First, create orders in cart
+      for (const item of state.items) {
+        await apiService.request(API_ENDPOINTS.ORDER.CREATE, {
+          method: 'POST',
+          body: JSON.stringify({
+            productId: item.id,
+            count: item.quantity
+          }),
+          credentials: 'include',
+          requiresAuth: true
+        });
+      }
+      
+      // Then, initiate checkout with delivery location
+      const { url } = await apiService.initiateCheckout({
         location: {
           address: `${data.address}, ${data.city}, ${data.postalCode}`,
           country: data.country,
         },
       });
 
-      // Here you would typically handle the payment with Stripe or another payment provider
-      // using the clientSecret
-
-      // For now, we'll just redirect to success
-      router.push("/checkout/success");
+      // Redirect to payment page
+      window.location.href = url;
     } catch (error) {
       console.error("Checkout failed:", error);
       toast.error("Failed to process checkout. Please try again.");
