@@ -48,9 +48,10 @@ export class ApiService {
   private async request(endpoint: string, options: RequestInit = {}): Promise<any> {
     const url = this.getFullUrl(endpoint);
     
-    // Ensure headers are set
+    // Ensure headers and CORS settings are set
     const headers = {
       'Content-Type': 'application/json',
+      'Accept': 'application/json',
       ...options.headers,
     };
 
@@ -74,7 +75,8 @@ export class ApiService {
       const response = await fetch(url, {
         ...options,
         headers,
-        credentials: options.credentials || 'same-origin'
+        credentials: 'include',
+        mode: 'cors'
       });
 
       let data;

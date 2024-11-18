@@ -7,12 +7,13 @@ export const API_ENDPOINTS = {
     REGISTER: '/v1/register',
     REFRESH: '/v1/refresh',
     VERIFY: '/v1/verify',
-    RESEND_CODE: '/v1/verify/resend',
   },
   PRODUCTS: {
-    CREATE: 'v1/product',
+    CREATE: '/v1/product',
     LIST: '/v1/products',
     DETAIL: '/v1/product',
+    UPLOAD_IMAGE: (id: string) => `/v1/product/${id}/image`,
+    DELETE_IMAGE: (id: string) => `/v1/product/${id}/image`,
   },
   ORDER: {
     CREATE: '/v1/order/create',

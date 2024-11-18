@@ -34,16 +34,6 @@ export default function Navbar() {
 
   const hasAdminAccess = isAuthenticated && (authService.isAdmin() || authService.canManageProducts());
 
-  // Debug information
-  console.log('Auth Debug:', {
-    isAuthenticated,
-    username,
-    userGroups: authService.getUserGroup(),
-    hasAdminAccess,
-    isAdmin: authService.isAdmin(),
-    canManageProducts: authService.canManageProducts()
-  });
-
   const handleUserClick = () => {
     if (!isAuthenticated) {
       router.push('/login');

@@ -201,15 +201,26 @@ export class AuthService {
   public async login(email: string, password: string): Promise<UserClaims> {
     try {
       console.log('Attempting login with:', { identity: email });
+      
+      // Validate inputs before making request
+      if (!email || !password) {
+        throw new AuthError('Email and password are required');
+      }
+
       const response = await this.apiService.login({ 
-        identity: email,
+        identity: email.trim().toLowerCase(),
         password 
       });
       
       console.log('Login response:', {
-        hasTokens: !!response.tokens,
-        tokenKeys: response.tokens ? Object.keys(response.tokens) : [],
+        hasTokens: !!response?.tokens,
+        tokenKeys: response?.tokens ? Object.keys(response.tokens) : [],
       });
+
+      if (!response || !response.tokens) {
+        console.error('Invalid login response:', response);
+        throw new AuthError('Invalid response from server');
+      }
 
       if (!this.validateTokenResponse(response.tokens)) {
         console.error('Invalid token response:', response.tokens);
@@ -242,8 +253,14 @@ export class AuthService {
       return idTokenClaims;
     } catch (error) {
       console.error('Login failed:', error);
+      
+      // Provide more specific error messages
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        throw new AuthError('Unable to connect to authentication service. Please check your internet connection.', 'NETWORK_ERROR');
+      }
+      
       const message = error instanceof Error ? error.message : 'Login failed';
-      throw new AuthError(message, 'LOGIN_FAILED');
+      throw new AuthError(message, error instanceof AuthError ? error.code : 'LOGIN_FAILED');
     }
   }
 
@@ -425,6 +442,28 @@ export class AuthService {
     );
   }
 
+  public getAccessToken(): string | null {
+    const tokens = this.getTokens();
+    if (!tokens?.AccessToken) {
+      console.warn('No access token found');
+      return null;
+    }
+    
+    // Validate token expiration
+    try {
+      const claims = this.parseToken(tokens.AccessToken);
+      if (!claims || claims.exp * 1000 < Date.now()) {
+        console.warn('Access token expired');
+        return null;
+      }
+    } catch (error) {
+      console.error('Failed to validate access token:', error);
+      return null;
+    }
+    
+    return tokens.AccessToken;
+  }
+
   private parseToken(token: string): UserClaims | null {
     try {
       const base64Url = token.split('.')[1];
@@ -437,7 +476,7 @@ export class AuthService {
       );
       
       const parsedPayload = JSON.parse(jsonPayload);
-      console.log('Full token payload:', parsedPayload);
+      // console.log('Full token payload:', parsedPayload);
       
       // Use the correct Cognito group claim name
       const groups = parsedPayload['cognito:groups'] || [];
@@ -452,11 +491,6 @@ export class AuthService {
       console.error('Failed to parse token:', error);
       return null;
     }
-  }
-
-  private getAccessToken(): string | null {
-    const tokens = this.getTokens();
-    return tokens?.AccessToken || null;
   }
 
   public getTokens(): AuthTokens | null {
@@ -480,7 +514,7 @@ export class AuthService {
     if (!token) return [];
 
     const claims = this.parseToken(token);
-    console.log('getUserGroup claims:', claims);
+    // console.log('getUserGroup claims:', claims);
     return claims?.groups || [];
   }
 
