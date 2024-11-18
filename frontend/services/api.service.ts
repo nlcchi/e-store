@@ -28,7 +28,8 @@ export class ApiService {
   private readonly baseUrl: string;
 
   private constructor() {
-    this.baseUrl = `${environment.API_BASE_URL}v1`;
+    // Remove trailing slash if present
+    this.baseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL || 'https://wnxng96g35.execute-api.ap-southeast-1.amazonaws.com').replace(/\/$/, '');
   }
 
   public static getInstance(): ApiService {
@@ -38,111 +39,141 @@ export class ApiService {
     return ApiService.instance;
   }
 
-  private async request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
-    const { requiresAuth = false, ...fetchOptions } = options;
-    const headers = new Headers(fetchOptions.headers);
+  private getFullUrl(endpoint: string): string {
+    // Remove leading slash from endpoint
+    const cleanEndpoint = endpoint.replace(/^\/+/, '');
+    return `${this.baseUrl}/${cleanEndpoint}`;
+  }
 
-    // Set default headers
-    headers.set('Content-Type', 'application/json');
-    headers.set('Accept', 'application/json');
+  private async request(endpoint: string, options: RequestInit = {}): Promise<any> {
+    const url = this.getFullUrl(endpoint);
     
-    if (requiresAuth) {
-      const token = await this.getAuthToken();
-      if (token) {
-        headers.set('Authorization', `Bearer ${token}`);
+    // Ensure headers are set
+    const headers = {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    };
+
+    // If Authorization header is provided, don't modify it
+    if (!headers['Authorization']) {
+      // Check if we need to use temporary token
+      if (endpoint === API_ENDPOINTS.AUTH.VERIFY) {
+        const tempToken = localStorage.getItem('TempAccessToken');
+        if (tempToken) {
+          headers['Authorization'] = `Bearer ${tempToken}`;
+        }
+      } else {
+        // For other endpoints, use regular access token
+        const accessToken = localStorage.getItem('AccessToken');
+        if (accessToken) {
+          headers['Authorization'] = `Bearer ${accessToken}`;
+        }
       }
     }
 
-    const requestOptions: RequestInit = {
-      ...fetchOptions,
-      headers,
-      credentials: 'include',
-      mode: 'cors',
-    };
-
     try {
-      console.log('Request:', {
-        url: `${this.baseUrl}${endpoint}`,
-        method: requestOptions.method,
-        headers: Object.fromEntries(headers.entries()),
-        body: requestOptions.body,
+      const requestBody = options.body ? JSON.parse(options.body as string) : undefined;
+      console.log(`API request to ${endpoint}:`, {
+        method: options.method,
+        url,
+        headers: {
+          ...headers,
+          Authorization: headers['Authorization'] ? '[REDACTED]' : undefined
+        },
+        body: requestBody ? {
+          ...requestBody,
+          password: requestBody.password ? '[REDACTED]' : undefined,
+          code: requestBody.code ? '[REDACTED]' : undefined
+        } : undefined
       });
 
-      const response = await fetch(`${this.baseUrl}${endpoint}`, requestOptions);
+      const response = await fetch(url, {
+        ...options,
+        headers,
+      });
+
       let data;
-      
       const contentType = response.headers.get('content-type');
       if (contentType && contentType.includes('application/json')) {
         data = await response.json();
       } else {
-        const text = await response.text();
-        try {
-          // Try to parse the text as JSON even if content-type is not set
-          data = JSON.parse(text);
-        } catch {
-          data = text;
-        }
+        data = await response.text();
       }
 
-      console.log('Response:', {
+      console.log('API response data:', {
         status: response.status,
         statusText: response.statusText,
         headers: Object.fromEntries(response.headers.entries()),
-        data,
+        data: typeof data === 'object' ? {
+          ...data,
+          // Redact sensitive data
+          accessToken: data?.accessToken ? '[REDACTED]' : undefined,
+          AccessToken: data?.AccessToken ? '[REDACTED]' : undefined,
+          idToken: data?.idToken ? '[REDACTED]' : undefined,
+          IdToken: data?.IdToken ? '[REDACTED]' : undefined,
+          session: data?.session ? '[REDACTED]' : undefined,
+          Session: data?.Session ? '[REDACTED]' : undefined,
+        } : data
       });
 
       if (!response.ok) {
-        let errorMessage = 'An error occurred';
-        let errorCode = undefined;
+        console.error('API error details:', {
+          status: response.status,
+          statusText: response.statusText,
+          url,
+          endpoint,
+          error: typeof data === 'object' ? data : { message: data },
+          requestBody: requestBody ? {
+            ...requestBody,
+            password: '[REDACTED]',
+            code: '[REDACTED]'
+          } : undefined
+        });
 
-        if (typeof data === 'object' && data !== null) {
-          // Handle AWS API Gateway error format
-          if ('message' in data) {
-            errorMessage = data.message;
-          } else if ('Message' in data) {
-            errorMessage = data.Message;
+        // Handle specific error cases
+        if (response.status === 400) {
+          if (typeof data === 'object' && data !== null) {
+            if (data.message) {
+              throw new Error(data.message);
+            } else if (data.error) {
+              throw new Error(data.error);
+            }
           }
-          
-          if ('code' in data) {
-            errorCode = data.code;
-          } else if ('Code' in data) {
-            errorCode = data.Code;
-          }
-        } else if (typeof data === 'string' && data.length > 0) {
-          errorMessage = data;
+          throw new Error('Invalid request. Please check your input values.');
+        } else if (response.status === 401) {
+          throw new Error('Authentication failed. Please login again.');
+        } else if (response.status === 403) {
+          throw new Error('You do not have permission to perform this action.');
+        } else if (response.status === 404) {
+          throw new Error('The requested resource was not found.');
+        } else if (response.status === 429) {
+          throw new Error('Too many requests. Please try again later.');
         }
 
-        const error: ApiError = {
-          message: errorMessage,
-          code: errorCode,
-        };
-        
-        throw error;
+        throw new Error(`Request failed with status ${response.status}`);
       }
 
       return data;
     } catch (error) {
       console.error('API request failed:', {
         error,
-        isError: error instanceof Error,
-        errorType: error?.constructor?.name,
-        errorProps: Object.getOwnPropertyNames(error || {}),
+        endpoint,
+        url,
+        request: {
+          method: options.method,
+          headers: {
+            ...headers,
+            Authorization: headers['Authorization'] ? '[REDACTED]' : undefined
+          },
+          body: options.body ? {
+            ...JSON.parse(options.body as string),
+            password: '[REDACTED]',
+            code: '[REDACTED]'
+          } : undefined
+        }
       });
 
-      if (error instanceof TypeError && error.message === 'Failed to fetch') {
-        throw new Error('Network error: Please check your internet connection');
-      }
-
-      // If it's already an ApiError, rethrow it
-      if (error && typeof error === 'object' && 'message' in error) {
-        throw error;
-      }
-
-      // Otherwise, wrap it in an ApiError
-      throw {
-        message: error instanceof Error ? error.message : 'An unexpected error occurred',
-        code: 'UNKNOWN_ERROR'
-      };
+      throw error;
     }
   }
 
@@ -190,6 +221,13 @@ export class ApiService {
     });
   }
 
+  public async getProfile() {
+    return this.request(API_ENDPOINTS.AUTH.PROFILE, {
+      method: 'GET',
+      requiresAuth: true,
+    });
+  }
+
   // Product endpoints
   public async getProducts() {
     return this.request(API_ENDPOINTS.PRODUCTS.LIST, {
@@ -198,7 +236,7 @@ export class ApiService {
   }
 
   public async getProduct(id: string) {
-    return this.request(`${API_ENDPOINTS.PRODUCTS.DETAIL}/${id}`, {
+    return this.request(API_ENDPOINTS.PRODUCTS.DETAIL(id), {
       method: 'GET',
     });
   }

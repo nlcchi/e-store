@@ -37,11 +37,15 @@ const signupSchema = z.object({
     .string()
     .min(3, 'Username must be at least 3 characters')
     .refine((val) => !val.includes(' '), 'Username cannot contain spaces')
-    .refine((val) => !val.includes('@'), 'Username cannot be an email address'),
-  email: z.string().email('Invalid email address'),
+    .refine((val) => !val.includes('@'), 'Username cannot be an email address')
+    .transform((val) => val.toLowerCase()),
+  email: z
+    .string()
+    .email('Invalid email address')
+    .transform((val) => val.toLowerCase()),
   password: z
     .string()
-    .min(6, 'Password must be at least 6 characters')
+    .min(8, 'Password must be at least 8 characters')
     .regex(
       /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
       'Password must contain at least one uppercase letter, one lowercase letter, one number and one special character'
@@ -62,25 +66,24 @@ export default function SignupPage() {
       username: '',
       email: '',
       password: '',
-      gender: undefined,
+      gender: 'male',
     },
   });
 
   const onSubmit = async (data: SignupFormData) => {
+    if (isLoading) return;
+    
     try {
+      setIsLoading(true);
       console.log('Submitting registration form:', {
         ...data,
         password: '[REDACTED]'
       });
-      setIsLoading(true);
+      
       await signUp(data.username, data.email, data.password, data.gender);
     } catch (error) {
       console.error('Registration error:', error);
-      toast.error(
-        error instanceof Error 
-          ? error.message 
-          : 'Failed to create account. Please try again.'
-      );
+      // Error is already handled by auth context
     } finally {
       setIsLoading(false);
     }
@@ -114,7 +117,10 @@ export default function SignupPage() {
           </CardHeader>
           <CardContent>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <form 
+                onSubmit={form.handleSubmit(onSubmit)} 
+                className="space-y-4"
+              >
                 <FormField
                   control={form.control}
                   name="username"
@@ -122,7 +128,11 @@ export default function SignupPage() {
                     <FormItem>
                       <FormLabel>Username</FormLabel>
                       <FormControl>
-                        <Input placeholder="johndoe" {...field} />
+                        <Input 
+                          placeholder="johndoe" 
+                          {...field} 
+                          disabled={isLoading}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -135,7 +145,12 @@ export default function SignupPage() {
                     <FormItem>
                       <FormLabel>Email</FormLabel>
                       <FormControl>
-                        <Input placeholder="john@example.com" type="email" {...field} />
+                        <Input 
+                          placeholder="john@example.com" 
+                          type="email" 
+                          {...field} 
+                          disabled={isLoading}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -148,7 +163,12 @@ export default function SignupPage() {
                     <FormItem>
                       <FormLabel>Password</FormLabel>
                       <FormControl>
-                        <Input placeholder="********" type="password" {...field} />
+                        <Input 
+                          placeholder="********" 
+                          type="password" 
+                          {...field} 
+                          disabled={isLoading}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -160,7 +180,11 @@ export default function SignupPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Gender</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        defaultValue={field.value}
+                        disabled={isLoading}
+                      >
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select your gender" />
@@ -175,14 +199,29 @@ export default function SignupPage() {
                     </FormItem>
                   )}
                 />
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? 'Creating account...' : 'Sign up'}
+                <Button 
+                  type="submit" 
+                  className="w-full" 
+                  disabled={isLoading || !form.formState.isValid}
+                >
+                  {isLoading ? (
+                    <>
+                      <span className="loading loading-spinner loading-sm mr-2"></span>
+                      Creating account...
+                    </>
+                  ) : (
+                    'Sign up'
+                  )}
                 </Button>
               </form>
             </Form>
             <div className="mt-4 text-center text-sm">
               Already have an account?{' '}
-              <Link href="/login" className="text-primary hover:underline">
+              <Link 
+                href="/login" 
+                className="text-primary hover:underline"
+                tabIndex={isLoading ? -1 : 0}
+              >
                 Sign in
               </Link>
             </div>
