@@ -88,12 +88,13 @@ export class AuthService {
         email: email.toLowerCase().trim(),
         password,
         gender: gender.toLowerCase(),
-        clientId: process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID || '3pjv7ovjv0rholpc1hpr0dn9tk'
+        clientId: environment.COGNITO.CLIENT_ID
       };
 
       console.log('Sending registration request:', {
         ...requestBody,
-        password: '[REDACTED]'
+        password: '[REDACTED]',
+        clientId: requestBody.clientId
       });
 
       const response = await this.apiService.request(API_ENDPOINTS.AUTH.REGISTER, {
@@ -119,10 +120,17 @@ export class AuthService {
         TokenType: response?.tokens?.TokenType || response?.tokens?.tokenType || 'Bearer'
       };
 
+      // Store session if available
+      if (response?.tokens?.Session || response?.tokens?.session) {
+        localStorage.setItem('TempSession', response?.tokens?.Session || response?.tokens?.session);
+        console.log('Stored TempSession');
+      }
+
       console.log('Registration response structure:', {
         hasAccessToken: !!tokens.AccessToken,
         hasIdToken: !!tokens.IdToken,
         hasRefreshToken: !!tokens.RefreshToken,
+        hasSession: !!(response?.tokens?.Session || response?.tokens?.session),
         tokenType: tokens.TokenType,
         responseKeys: Object.keys(response?.tokens || {})
       });
@@ -192,9 +200,9 @@ export class AuthService {
 
   public async login(email: string, password: string): Promise<void> {
     try {
-      console.log('Attempting login with:', { username: email });
+      console.log('Attempting login with:', { identity: email });
       const response = await this.apiService.login({ 
-        username: email, // Use email as username
+        identity: email, // Backend expects 'identity' instead of 'username'
         password 
       });
       
@@ -245,22 +253,28 @@ export class AuthService {
     try {
       console.log('Verifying email for user:', username);
 
-      // Get the temporary access token
+      // Get the temporary tokens
       const tempAccessToken = localStorage.getItem('TempAccessToken');
+      
       if (!tempAccessToken) {
         throw new AuthError('No access token found. Please register again.');
       }
 
+      console.log('Sending verification request with code:', code);
+
+      // Backend expects code as query parameter
       const response = await this.apiService.request(`${API_ENDPOINTS.AUTH.VERIFY}?code=${code}`, {
         method: 'POST',
+        credentials: 'include',  // Important for cookies
         headers: {
-          'Authorization': `Bearer ${tempAccessToken}`
+          'Cookie': `AccessToken=${tempAccessToken}` // Send token as cookie
         }
       });
 
       console.log('Email verification response:', {
         success: !!response,
-        username
+        username,
+        hasTokens: !!response?.tokens
       });
 
       if (!response) {

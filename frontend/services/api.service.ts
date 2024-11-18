@@ -10,7 +10,7 @@ interface AuthTokens {
 }
 
 interface LoginCredentials {
-  username: string;
+  identity: string;
   password: string;
 }
 
@@ -29,7 +29,7 @@ export class ApiService {
 
   private constructor() {
     // Remove trailing slash if present
-    this.baseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL || 'https://wnxng96g35.execute-api.ap-southeast-1.amazonaws.com').replace(/\/$/, '');
+    this.baseUrl = environment.API_BASE_URL.replace(/\/$/, '');
   }
 
   public static getInstance(): ApiService {
@@ -54,23 +54,6 @@ export class ApiService {
       ...options.headers,
     };
 
-    // If Authorization header is provided, don't modify it
-    if (!headers['Authorization']) {
-      // Check if we need to use temporary token
-      if (endpoint === API_ENDPOINTS.AUTH.VERIFY) {
-        const tempToken = localStorage.getItem('TempAccessToken');
-        if (tempToken) {
-          headers['Authorization'] = `Bearer ${tempToken}`;
-        }
-      } else {
-        // For other endpoints, use regular access token
-        const accessToken = localStorage.getItem('AccessToken');
-        if (accessToken) {
-          headers['Authorization'] = `Bearer ${accessToken}`;
-        }
-      }
-    }
-
     try {
       const requestBody = options.body ? JSON.parse(options.body as string) : undefined;
       console.log(`API request to ${endpoint}:`, {
@@ -78,18 +61,20 @@ export class ApiService {
         url,
         headers: {
           ...headers,
-          Authorization: headers['Authorization'] ? '[REDACTED]' : undefined
+          Cookie: headers['Cookie'] ? '[REDACTED]' : undefined
         },
         body: requestBody ? {
           ...requestBody,
           password: requestBody.password ? '[REDACTED]' : undefined,
           code: requestBody.code ? '[REDACTED]' : undefined
-        } : undefined
+        } : undefined,
+        credentials: options.credentials
       });
 
       const response = await fetch(url, {
         ...options,
         headers,
+        credentials: options.credentials || 'same-origin'
       });
 
       let data;
@@ -163,13 +148,14 @@ export class ApiService {
           method: options.method,
           headers: {
             ...headers,
-            Authorization: headers['Authorization'] ? '[REDACTED]' : undefined
+            Cookie: headers['Cookie'] ? '[REDACTED]' : undefined
           },
           body: options.body ? {
             ...JSON.parse(options.body as string),
             password: '[REDACTED]',
             code: '[REDACTED]'
-          } : undefined
+          } : undefined,
+          credentials: options.credentials
         }
       });
 
