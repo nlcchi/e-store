@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { NavigationMenu } from "@/components/ui/navigation-menu";
@@ -11,17 +12,37 @@ import {
   Sun,
   Moon,
   Menu,
+  LogOut,
 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { CartSheet } from "@/components/cart-sheet";
+import { useAuth } from "@/lib/auth-context";
 
 export default function Navbar() {
   const { setTheme, theme } = useTheme();
+  const router = useRouter();
+  const { isAuthenticated, username, logout } = useAuth();
+
+  const handleUserClick = () => {
+    if (!isAuthenticated) {
+      router.push('/login');
+    }
+  };
+
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(part => part[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -78,9 +99,36 @@ export default function Navbar() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button variant="ghost" size="icon">
-            <User className="h-5 w-5" />
-          </Button>
+          {isAuthenticated ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="relative h-8 w-8 rounded-full">
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium">
+                    {username ? getInitials(username) : 'U'}
+                  </div>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem onClick={() => router.push('/profile')}>
+                  <User className="mr-2 h-4 w-4" />
+                  Profile
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push('/orders')}>
+                  <ShoppingCart className="mr-2 h-4 w-4" />
+                  Orders
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={logout}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Logout
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Button variant="ghost" size="icon" onClick={handleUserClick}>
+              <User className="h-5 w-5" />
+            </Button>
+          )}
           
           <CartSheet />
         </div>
