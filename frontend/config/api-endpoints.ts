@@ -8,6 +8,7 @@ export const API_ENDPOINTS = {
     REFRESH: '/refresh',
   },
   PRODUCTS: {
+    CREATE: '/product',
     LIST: '/products',
     DETAIL: '/product',
   },
