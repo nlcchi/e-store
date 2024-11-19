@@ -10,6 +10,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   username: string | null;
+  isAdmin: boolean;
   register: (username: string, email: string, password: string, gender: string) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -23,6 +24,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [username, setUsername] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const router = useRouter();
   const authService = AuthService.getInstance();
 
@@ -113,19 +115,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const userClaims = await authService.login(email, password);
         setIsAuthenticated(true);
-        setUsername(userClaims.email);
+        setUsername(userClaims.username);
         toast.success('Login successful!');
         
         // Check if user has admin access
-        const userGroups = authService.getUserGroup();
-        const isAdmin = userGroups.includes(environment.COGNITO.USER_GROUPS.ADMIN);
-        const canManageProducts = userGroups.includes(environment.COGNITO.USER_GROUPS.MANAGE_PRODUCT);
-        
+        const tokens = authService.getTokens();
+        if (tokens?.IdToken) {
+          const claims = authService.parseToken(tokens.IdToken);
+          if (claims?.groups?.includes('admin')) {
+            setIsAdmin(true);
+          }
+        }
+
         // Redirect based on user role
-        if (isAdmin || canManageProducts) {
+        if (isAdmin) {
           router.push('/admin');
         } else {
-          router.push('/');
+          router.push('/dashboard');
         }
       } catch (error) {
         console.error('Login error:', error);
@@ -139,7 +145,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsLoading(false);
       }
     },
-    [router]
+    [router, isAdmin]
   );
 
   const logout = useCallback(async () => {
@@ -148,6 +154,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await authService.logout();
       setIsAuthenticated(false);
       setUsername(null);
+      setIsAdmin(false);
       toast.success('Logged out successfully');
       router.push('/login');
     } catch (error) {
@@ -229,6 +236,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isAuthenticated,
     isLoading,
     username,
+    isAdmin,
     register,
     login,
     logout,
