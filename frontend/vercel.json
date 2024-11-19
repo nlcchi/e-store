@@ -1,0 +1,43 @@
+{
+  "version": 2,
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "regions": ["sin1"],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET,DELETE,PATCH,POST,PUT,OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization"
+        },
+        {
+          "key": "Access-Control-Allow-Credentials",
+          "value": "true"
+        }
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/v1/:path*",
+      "destination": "https://gvuu1iidve.execute-api.ap-southeast-1.amazonaws.com/v1/:path*"
+    }
+  ],
+  "env": {
+    "NEXT_PUBLIC_API_URL": "https://gvuu1iidve.execute-api.ap-southeast-1.amazonaws.com",
+    "NEXT_PUBLIC_COGNITO_USER_POOL_ID": "ap-southeast-1_YkHJlmoyg",
+    "NEXT_PUBLIC_COGNITO_CLIENT_ID": "2pfmq0v0b7vfstt4hq4vm0klbr",
+    "NEXT_PUBLIC_COGNITO_REGION": "ap-southeast-1"
+  }
+}
