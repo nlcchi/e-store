@@ -26,7 +26,10 @@ interface Product {
   name: string;
   description: string;
   price: number;
+  category: string;
   imageUrl?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export default function AdminPage() {
@@ -42,6 +45,7 @@ export default function AdminPage() {
 
   const fetchProducts = async () => {
     try {
+      setLoading(true);
       const products = await apiService.listProducts();
       setProducts(products);
     } catch (error) {
@@ -63,6 +67,7 @@ export default function AdminPage() {
         name: formData.get('name') as string,
         description: formData.get('description') as string,
         price: parseFloat(formData.get('price') as string),
+        category: formData.get('category') as string || 'general', // Default category
       };
 
       const newProduct = await apiService.createProduct(productData);
@@ -152,6 +157,15 @@ export default function AdminPage() {
                 />
               </div>
               <div>
+                <Label htmlFor="category">Category</Label>
+                <Input 
+                  id="category" 
+                  name="category" 
+                  placeholder="e.g., Electronics, Clothing, etc."
+                  required 
+                />
+              </div>
+              <div>
                 <Label htmlFor="image">Image</Label>
                 <Input 
                   id="image" 
@@ -182,6 +196,7 @@ export default function AdminPage() {
               <TableHead>Name</TableHead>
               <TableHead>Description</TableHead>
               <TableHead>Price</TableHead>
+              <TableHead>Category</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -216,6 +231,7 @@ export default function AdminPage() {
                 <TableCell>{product.name}</TableCell>
                 <TableCell>{product.description}</TableCell>
                 <TableCell>${product.price.toFixed(2)}</TableCell>
+                <TableCell>{product.category}</TableCell>
                 <TableCell>
                   <div className="flex space-x-2">
                     <Button variant="outline" size="icon">
