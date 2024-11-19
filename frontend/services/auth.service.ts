@@ -31,6 +31,19 @@ interface RegisterResponse {
   email: string;
 }
 
+interface AuthTokens {
+  IdToken: string;
+  AccessToken: string;
+  RefreshToken: string;
+}
+
+interface TokenClaims {
+  sub: string;
+  email: string;
+  groups?: string[];
+  exp: number;
+}
+
 class AuthError extends Error {
   code?: string;
 
@@ -41,23 +54,18 @@ class AuthError extends Error {
   }
 }
 
-export interface AuthTokens {
-  AccessToken: string;
-  IdToken: string;
-  RefreshToken: string;
-  TokenType?: string;
-}
-
 export class AuthService {
   private static instance: AuthService;
   private apiService: ApiService;
   private accessToken: string | null = null;
   private refreshToken: string | null = null;
+  private idToken: string | null = null;
   private username: string | null = null;
   private email: string | null = null;
 
   private constructor() {
     this.apiService = ApiService.getInstance();
+    this.loadTokens();
   }
 
   public static getInstance(): AuthService {
@@ -65,6 +73,23 @@ export class AuthService {
       AuthService.instance = new AuthService();
     }
     return AuthService.instance;
+  }
+
+  private loadTokens(): void {
+    this.accessToken = localStorage.getItem('AccessToken');
+    this.refreshToken = localStorage.getItem('RefreshToken');
+    this.idToken = localStorage.getItem('IdToken');
+  }
+
+  public getTokens(): AuthTokens | null {
+    if (!this.accessToken || !this.idToken || !this.refreshToken) {
+      return null;
+    }
+    return {
+      AccessToken: this.accessToken,
+      IdToken: this.idToken,
+      RefreshToken: this.refreshToken
+    };
   }
 
   public async register(
@@ -180,7 +205,11 @@ export class AuthService {
         body: JSON.stringify({ email, password }),
       });
 
-      this.setTokens(response.accessToken, response.refreshToken);
+      this.setTokens({
+        AccessToken: response.accessToken,
+        RefreshToken: response.refreshToken,
+        IdToken: response.accessToken // Using accessToken as IdToken for now
+      });
       this.username = response.username;
       this.email = response.email;
     } catch (error) {
@@ -224,27 +253,31 @@ export class AuthService {
     return this.email;
   }
 
-  private setTokens(accessToken: string, refreshToken: string): void {
-    this.accessToken = accessToken;
-    this.refreshToken = refreshToken;
-    localStorage.setItem('accessToken', accessToken);
-    localStorage.setItem('refreshToken', refreshToken);
+  private setTokens(tokens: AuthTokens): void {
+    this.accessToken = tokens.AccessToken;
+    this.refreshToken = tokens.RefreshToken;
+    this.idToken = tokens.IdToken;
+    localStorage.setItem('AccessToken', tokens.AccessToken);
+    localStorage.setItem('RefreshToken', tokens.RefreshToken);
+    localStorage.setItem('IdToken', tokens.IdToken);
   }
 
   private clearTokens(): void {
     this.accessToken = null;
     this.refreshToken = null;
+    this.idToken = null;
     this.username = null;
     this.email = null;
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('AccessToken');
+    localStorage.removeItem('RefreshToken');
+    localStorage.removeItem('IdToken');
   }
 
   public isAuthenticated(): boolean {
-    return !!this.accessToken;
+    return !!this.accessToken && !!this.idToken;
   }
 
-  public parseToken(token: string): { groups?: string[] } | null {
+  public parseToken(token: string): TokenClaims | null {
     try {
       const base64Url = token.split('.')[1];
       const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
@@ -254,7 +287,14 @@ export class AuthService {
           .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
           .join('')
       );
-      return JSON.parse(jsonPayload);
+
+      const claims = JSON.parse(jsonPayload);
+      return {
+        sub: claims.sub,
+        email: claims.email,
+        groups: claims['cognito:groups'] || [],
+        exp: claims.exp
+      };
     } catch (error) {
       console.error('Failed to parse token:', error);
       return null;
@@ -262,8 +302,8 @@ export class AuthService {
   }
 
   public getUserGroups(): string[] {
-    if (!this.accessToken) return [];
-    const claims = this.parseToken(this.accessToken);
+    if (!this.idToken) return [];
+    const claims = this.parseToken(this.idToken);
     return claims?.groups || [];
   }
 
