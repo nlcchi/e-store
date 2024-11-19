@@ -31,6 +31,17 @@ interface ProfileResponse {
   updatedAt: string;
 }
 
+interface Product {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  category: string;
+  imageUrl?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export class ApiService {
   private static instance: ApiService | null = null;
   private readonly baseUrl: string;
@@ -220,15 +231,35 @@ export class ApiService {
   }
 
   // Product endpoints
-  public async getProducts() {
-    return this.request(API_ENDPOINTS.PRODUCTS.LIST, {
+  public async getProduct(id: string): Promise<Product> {
+    return this.request<Product>(API_ENDPOINTS.PRODUCTS.DETAIL(id), {
       method: 'GET',
     });
   }
 
-  public async getProduct(id: string) {
-    return this.request(API_ENDPOINTS.PRODUCTS.DETAIL(id), {
+  public async updateProduct(id: string, data: Partial<Product>): Promise<Product> {
+    return this.request<Product>(API_ENDPOINTS.PRODUCTS.UPDATE(id), {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  public async deleteProduct(id: string): Promise<void> {
+    return this.request<void>(API_ENDPOINTS.PRODUCTS.DELETE(id), {
+      method: 'DELETE',
+    });
+  }
+
+  public async listProducts(): Promise<Product[]> {
+    return this.request<Product[]>(API_ENDPOINTS.PRODUCTS.LIST, {
       method: 'GET',
+    });
+  }
+
+  public async createProduct(data: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>): Promise<Product> {
+    return this.request<Product>(API_ENDPOINTS.PRODUCTS.CREATE, {
+      method: 'POST',
+      body: JSON.stringify(data),
     });
   }
 

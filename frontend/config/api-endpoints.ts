@@ -8,14 +8,16 @@ export const API_ENDPOINTS = {
     REFRESH: '/v1/refresh',
     VERIFY: '/v1/verify',
     PROFILE: '/v1/profile'
-  },
+  } as const,
+  
   PRODUCTS: {
-    CREATE: '/v1/product',
     LIST: '/v1/products',
-    DETAIL: '/v1/product',
-    UPLOAD_IMAGE: (id: string) => `/v1/product/${id}/image`,
-    DELETE_IMAGE: (id: string) => `/v1/product/${id}/image`,
+    CREATE: '/v1/products',
+    UPDATE: (id: string) => `/v1/products/${id}`,
+    DELETE: (id: string) => `/v1/products/${id}`,
+    DETAIL: (id: string) => `/v1/products/${id}`
   },
+  
   ORDER: {
     CREATE: '/v1/order/create',
     LIST: '/v1/order',
