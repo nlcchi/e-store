@@ -7,6 +7,7 @@ export const API_ENDPOINTS = {
     REGISTER: '/v1/register',
     REFRESH: '/v1/refresh',
     VERIFY: '/v1/verify',
+    PROFILE: '/v1/profile'
   },
   PRODUCTS: {
     CREATE: '/v1/product',

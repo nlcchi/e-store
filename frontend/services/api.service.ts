@@ -23,6 +23,14 @@ interface ApiError {
   code?: string;
 }
 
+interface ProfileResponse {
+  username: string;
+  email: string;
+  role: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export class ApiService {
   private static instance: ApiService | null = null;
   private readonly baseUrl: string;
@@ -204,8 +212,8 @@ export class ApiService {
     });
   }
 
-  public async getProfile() {
-    return this.request(API_ENDPOINTS.AUTH.PROFILE, {
+  public async getProfile(): Promise<ProfileResponse> {
+    return this.request<ProfileResponse>(API_ENDPOINTS.AUTH.PROFILE, {
       method: 'GET',
       requiresAuth: true,
     });
