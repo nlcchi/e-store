@@ -9,7 +9,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useRouter } from "next/navigation";
-import { ApiService } from "@/services/api.service";
 import { useState } from "react";
 import { toast } from "sonner";
 import { ProtectedRoute } from "@/components/auth/protected-route";
@@ -26,10 +25,9 @@ const checkoutSchema = z.object({
 type CheckoutForm = z.infer<typeof checkoutSchema>;
 
 export default function CheckoutPage() {
-  const { state } = useCart();
+  const { state, dispatch } = useCart();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const apiService = ApiService.getInstance();
 
   const {
     register,
@@ -43,29 +41,17 @@ export default function CheckoutPage() {
     try {
       setIsLoading(true);
       
-      // First, create orders in cart
-      for (const item of state.items) {
-        await apiService.request(API_ENDPOINTS.ORDER.CREATE, {
-          method: 'POST',
-          body: JSON.stringify({
-            productId: item.id,
-            count: item.quantity
-          }),
-          credentials: 'include',
-          requiresAuth: true
-        });
-      }
-      
-      // Then, initiate checkout with delivery location
-      const { url } = await apiService.initiateCheckout({
-        location: {
-          address: `${data.address}, ${data.city}, ${data.postalCode}`,
-          country: data.country,
-        },
-      });
+      // For demo purposes, simulate order processing
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // Redirect to payment page
-      window.location.href = url;
+      // Redirect to success page
+      router.push('/checkout/success');
+      
+      // Clear cart after successful order
+      dispatch({ type: 'CLEAR_CART' });
+
+      // Show success message
+      toast.success('Order placed successfully!');
     } catch (error) {
       console.error("Checkout failed:", error);
       toast.error("Failed to process checkout. Please try again.");
