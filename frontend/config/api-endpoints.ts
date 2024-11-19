@@ -15,7 +15,9 @@ export const API_ENDPOINTS = {
     CREATE: '/v1/products',
     UPDATE: (id: string) => `/v1/products/${id}`,
     DELETE: (id: string) => `/v1/products/${id}`,
-    DETAIL: (id: string) => `/v1/products/${id}`
+    DETAIL: (id: string) => `/v1/products/${id}`,
+    UPLOAD_IMAGE: (id: string) => `/v1/products/${id}/image`,
+    DELETE_IMAGE: (id: string) => `/v1/products/${id}/image`
   },
   
   ORDER: {

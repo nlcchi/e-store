@@ -263,6 +263,23 @@ export class ApiService {
     });
   }
 
+  public async uploadProductImage(productId: string, formData: FormData): Promise<{ imageUrl: string }> {
+    return this.request<{ imageUrl: string }>(API_ENDPOINTS.PRODUCTS.UPLOAD_IMAGE(productId), {
+      method: 'POST',
+      body: formData,
+      headers: {
+        // Remove Content-Type to let browser set it with boundary for FormData
+        'Content-Type': undefined,
+      },
+    });
+  }
+
+  public async deleteProductImage(productId: string): Promise<void> {
+    return this.request<void>(API_ENDPOINTS.PRODUCTS.DELETE_IMAGE(productId), {
+      method: 'DELETE',
+    });
+  }
+
   // Payment endpoints
   public async initiateCheckout(data: { 
     orders: Array<{ productId: string; count: number }>;

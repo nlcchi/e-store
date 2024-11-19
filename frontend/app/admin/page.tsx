@@ -26,6 +26,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { environment } from "@/config/environment";
 import { API_ENDPOINTS } from "@/config/api-endpoints";
+import { apiService } from "@/services/api.service";
 
 interface Product {
   id: string;
@@ -103,7 +104,8 @@ export default function AdminPage() {
       
       // If there's an image, upload it
       if (imageFile && newProduct.id) {
-        await handleImageUpload(newProduct.id, imageFile);
+        const imageUrl = await handleImageUpload(newProduct.id, imageFile);
+        newProduct.imageUrl = imageUrl;
       }
 
       toast({
@@ -112,7 +114,7 @@ export default function AdminPage() {
       });
 
       setIsDialogOpen(false);
-      fetchProducts(); // Refresh the product list
+      setProducts([...products, newProduct]); // Refresh the product list
     } catch (error) {
       console.error('Error creating product:', error);
       toast({
@@ -130,62 +132,24 @@ export default function AdminPage() {
       const formData = new FormData();
       formData.append('image', file);
 
-      const accessToken = authService.getAccessToken();
-      const response = await fetch(
-        `${environment.API_BASE_URL}${API_ENDPOINTS.PRODUCTS.UPLOAD_IMAGE(productId)}`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-          },
-          body: formData,
-        }
-      );
-
-      if (!response.ok) throw new Error('Failed to upload image');
-
-      toast({
-        title: "Success",
-        description: "Image uploaded successfully!",
-      });
+      const result = await apiService.uploadProductImage(productId, formData);
+      toast.success('Image uploaded successfully');
+      return result.imageUrl;
     } catch (error) {
-      console.error('Error uploading image:', error);
-      toast({
-        title: "Error",
-        description: "Failed to upload image. Please try again.",
-        variant: "destructive",
-      });
+      console.error('Image upload error:', error);
+      toast.error('Failed to upload image');
+      throw error;
     }
   };
 
-  const handleDeleteImage = async (productId: string) => {
+  const handleImageDelete = async (productId: string) => {
     try {
-      const accessToken = authService.getAccessToken();
-      const response = await fetch(
-        `${environment.API_BASE_URL}${API_ENDPOINTS.PRODUCTS.DELETE_IMAGE(productId)}`,
-        {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-          },
-        }
-      );
-
-      if (!response.ok) throw new Error('Failed to delete image');
-
-      toast({
-        title: "Success",
-        description: "Image deleted successfully!",
-      });
-
-      fetchProducts(); // Refresh the product list
+      await apiService.deleteProductImage(productId);
+      toast.success('Image deleted successfully');
     } catch (error) {
-      console.error('Error deleting image:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete image. Please try again.",
-        variant: "destructive",
-      });
+      console.error('Image delete error:', error);
+      toast.error('Failed to delete image');
+      throw error;
     }
   };
 
@@ -277,7 +241,7 @@ export default function AdminPage() {
                           variant="destructive"
                           size="icon"
                           className="absolute -top-2 -right-2"
-                          onClick={() => handleDeleteImage(product.id)}
+                          onClick={() => handleImageDelete(product.id)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
