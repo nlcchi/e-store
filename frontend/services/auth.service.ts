@@ -83,7 +83,7 @@ export class AuthService {
     return {
       AccessToken: this.accessToken,
       IdToken: this.idToken,
-      RefreshToken: this.refreshToken
+      ...(this.refreshToken ? { RefreshToken: this.refreshToken } : {})
     };
   }
 
