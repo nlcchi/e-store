@@ -42,6 +42,10 @@ interface Product {
   updatedAt: string;
 }
 
+interface ImageUploadResponse {
+  imageUrl: string;
+}
+
 export class ApiService {
   private static instance: ApiService;
   private baseUrl: string;
@@ -63,13 +67,14 @@ export class ApiService {
 
   public async request<T>(
     url: string, 
-    options: RequestInit & { token?: string } = {}
+    options: RequestInit & { token?: string; skipContentType?: boolean } = {}
   ): Promise<T> {
-    const { token, ...restOptions } = options;
-    const headers = new Headers({
-      'Content-Type': 'application/json',
-      ...(restOptions.headers as Record<string, string>),
-    });
+    const { token, skipContentType, ...restOptions } = options;
+    const headers = new Headers(restOptions.headers);
+
+    if (!skipContentType) {
+      headers.set('Content-Type', 'application/json');
+    }
 
     if (token) {
       headers.set('Authorization', `Bearer ${token}`);
@@ -172,13 +177,25 @@ export class ApiService {
     });
   }
 
-  public async uploadProductImage(productId: string, formData: FormData): Promise<{ imageUrl: string }> {
-    const url = API_ENDPOINTS.PRODUCTS.UPLOAD_IMAGE(productId);
+  public async uploadProductImage(
+    productId: string,
+    file: File,
+    token: string
+  ): Promise<ImageUploadResponse> {
     try {
-      const response = await this.request(url, {
-        method: 'POST',
-        body: formData,
-      });
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const response = await this.request<ImageUploadResponse>(
+        API_ENDPOINTS.PRODUCTS.UPLOAD_IMAGE(productId),
+        {
+          method: 'POST',
+          body: formData,
+          token,
+          skipContentType: true, // Let browser set correct content-type for FormData
+        }
+      );
+
       return response;
     } catch (error) {
       console.error('Error uploading product image:', error);
