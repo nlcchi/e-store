@@ -250,14 +250,14 @@ export class AuthService {
   public isAdmin(): boolean {
     if (!this.idToken) return false;
     const claims = this.parseToken(this.idToken);
-    return claims?.groups?.includes(environment.USER_GROUPS.ADMIN) || false;
+    return claims?.groups?.includes(environment.COGNITO.USER_GROUPS.ADMIN) || false;
   }
 
   public canManageProducts(): boolean {
     if (!this.idToken) return false;
     const claims = this.parseToken(this.idToken);
     return (
-      claims?.groups?.includes(environment.USER_GROUPS.MANAGE_PRODUCT) ||
+      claims?.groups?.includes(environment.COGNITO.USER_GROUPS.MANAGE_PRODUCT) ||
       this.isAdmin() ||
       false
     );
