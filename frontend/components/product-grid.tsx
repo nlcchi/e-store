@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { ShoppingCart } from "lucide-react";
 import { useCart } from "@/lib/cart-context";
 import { useToast } from "@/components/ui/use-toast";
-import { environment } from '@/config/environment';
 
 interface ProductGridProps {
   initialProducts?: Product[];
@@ -31,7 +30,7 @@ export default function ProductGrid({ initialProducts = [], filters }: ProductGr
       
       try {
         setLoading(true);
-        const response = await fetch(`${environment.API_BASE_URL}/v1/products`, {
+        const response = await fetch('/api/products', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

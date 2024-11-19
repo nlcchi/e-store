@@ -1,10 +1,9 @@
 import ProductGrid from "@/components/product-grid";
-import { environment } from '@/config/environment';
 import { Product } from '@/types/product';
 
 async function getNewArrivals(): Promise<Product[]> {
   try {
-    const response = await fetch(`${environment.API_BASE_URL}/v1/products`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_VERCEL_URL || ''}/api/products`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

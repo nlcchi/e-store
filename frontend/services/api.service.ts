@@ -62,7 +62,11 @@ export class ApiService {
   }
 
   private getFullUrl(path: string): string {
-    return `${this.baseUrl}${path}`;
+    // Use relative URLs in production, absolute URLs in development
+    if (process.env.NODE_ENV === 'production') {
+      return path;
+    }
+    return `${environment.API_BASE_URL}${path}`;
   }
 
   public async request<T>(
