@@ -15,15 +15,6 @@ interface ProductGridProps {
   filters?: ProductFilters;
 }
 
-interface ProductResponse {
-  queryResult: Product[];
-  lastKey?: {
-    id: {
-      S: string;
-    };
-  };
-}
-
 export default function ProductGrid({ initialProducts = [], filters }: ProductGridProps) {
   const [products, setProducts] = useState<Product[]>(initialProducts || []);
   const [lastKey, setLastKey] = useState<string | null>(null);
