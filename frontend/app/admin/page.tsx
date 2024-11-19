@@ -95,16 +95,19 @@ export default function AdminPage() {
     }
   };
 
-  const handleImageUpload = async (productId: string, file: File) => {
+  const handleImageUpload = async (productId: string, file: File): Promise<string> => {
     try {
-      const formData = new FormData();
-      formData.append('image', file);
+      const authService = AuthService.getInstance();
+      const token = authService.getAccessToken();
+      if (!token) {
+        throw new Error('No access token found');
+      }
 
-      const result = await apiService.uploadProductImage(productId, formData);
+      const result = await apiService.uploadProductImage(productId, file, token);
       toast.success('Image uploaded successfully');
       return result.imageUrl;
     } catch (error) {
-      console.error('Image upload error:', error);
+      console.error('Error uploading image:', error);
       toast.error('Failed to upload image');
       throw error;
     }
