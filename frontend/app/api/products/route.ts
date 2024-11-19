@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { environment } from '@/config/environment';
+import { API_ENDPOINTS } from '@/config/api-endpoints';
 import { headers } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const filters = Object.fromEntries(searchParams.entries());
 
-    const apiUrl = new URL(`${environment.API_BASE_URL}/v1/products`);
+    const apiUrl = new URL(`${environment.API_BASE_URL}${API_ENDPOINTS.PRODUCTS.LIST}`);
     // Add filters as query parameters
     Object.entries(filters).forEach(([key, value]) => {
       apiUrl.searchParams.append(key, value);
@@ -56,8 +57,8 @@ export async function GET(request: NextRequest) {
       throw new Error(`API request failed: ${response.statusText}`);
     }
 
-    const products = await response.json();
-    return corsResponse(new NextResponse(JSON.stringify(products), {
+    const data = await response.json();
+    return corsResponse(new NextResponse(JSON.stringify(data), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     }));
@@ -73,7 +74,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const apiUrl = `${environment.API_BASE_URL}/v1/products`;
+    const apiUrl = `${environment.API_BASE_URL}${API_ENDPOINTS.PRODUCTS.CREATE}`;
     
     const headersList = headers();
     const authHeader = headersList.get('Authorization');

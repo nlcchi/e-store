@@ -30,23 +30,34 @@ export default function ProductGrid({ initialProducts = [], filters }: ProductGr
       
       try {
         setLoading(true);
-        const response = await fetch('/api/products', {
-          method: 'POST',
+        const url = new URL('/api/products', window.location.origin);
+        
+        // Add filters as query parameters
+        if (filters) {
+          Object.entries(filters).forEach(([key, value]) => {
+            if (value) url.searchParams.append(key, value.toString());
+          });
+        }
+
+        const response = await fetch(url.toString(), {
+          method: 'GET',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(filters),
         });
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const data: ProductResponse = await response.json();
+        const data = await response.json();
         
-        if (data.queryResult && Array.isArray(data.queryResult)) {
+        if (Array.isArray(data)) {
+          setProducts(data);
+          setError(null);
+        } else if (data.queryResult && Array.isArray(data.queryResult)) {
           setProducts(data.queryResult);
-          setLastKey(data.lastKey?.id.S || null);
+          setLastKey(data.lastKey?.id?.S || null);
           setError(null);
         } else {
           throw new Error('Invalid response format');
