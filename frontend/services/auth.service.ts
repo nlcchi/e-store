@@ -1,40 +1,31 @@
 'use client';
 
-import { environment } from '../config/environment';
-import { ApiService } from './api.service';
 import { API_ENDPOINTS } from '@/config/api-endpoints';
+import { environment } from '@/config/environment';
+import { ApiService } from './api.service';
 
-interface UserClaims {
-  sub: string;
-  email: string;
-  groups: string[];
-  exp: number;
+export interface AuthTokens {
+  AccessToken: string;
+  IdToken: string;
+  RefreshToken?: string;
 }
 
 interface LoginResponse {
-  accessToken: string;
-  refreshToken: string;
+  tokens: AuthTokens;
+  username: string;
+  email: string;
+}
+
+interface RegisterResponse {
+  tokens: AuthTokens;
   username: string;
   email: string;
 }
 
 interface ProfileResponse {
-  id: string;
   username: string;
   email: string;
-  role: string;
-}
-
-interface RegisterResponse {
-  id: string;
-  username: string;
-  email: string;
-}
-
-interface AuthTokens {
-  IdToken: string;
-  AccessToken: string;
-  RefreshToken: string;
+  groups?: string[];
 }
 
 interface TokenClaims {
@@ -44,22 +35,12 @@ interface TokenClaims {
   exp: number;
 }
 
-class AuthError extends Error {
-  code?: string;
-
-  constructor(message: string, code?: string) {
-    super(message);
-    this.name = 'AuthError';
-    this.code = code;
-  }
-}
-
 export class AuthService {
   private static instance: AuthService;
   private apiService: ApiService;
   private accessToken: string | null = null;
-  private refreshToken: string | null = null;
   private idToken: string | null = null;
+  private refreshToken: string | null = null;
   private username: string | null = null;
   private email: string | null = null;
 
@@ -77,14 +58,28 @@ export class AuthService {
 
   private loadTokens(): void {
     this.accessToken = localStorage.getItem('AccessToken');
-    this.refreshToken = localStorage.getItem('RefreshToken');
     this.idToken = localStorage.getItem('IdToken');
+    this.refreshToken = localStorage.getItem('RefreshToken');
+  }
+
+  private setTokens(tokens: AuthTokens): void {
+    this.accessToken = tokens.AccessToken;
+    this.idToken = tokens.IdToken;
+    this.refreshToken = tokens.RefreshToken || null;
+
+    localStorage.setItem('AccessToken', tokens.AccessToken);
+    localStorage.setItem('IdToken', tokens.IdToken);
+    if (tokens.RefreshToken) {
+      localStorage.setItem('RefreshToken', tokens.RefreshToken);
+    }
+  }
+
+  public getAccessToken(): string | null {
+    return this.accessToken;
   }
 
   public getTokens(): AuthTokens | null {
-    if (!this.accessToken || !this.idToken || !this.refreshToken) {
-      return null;
-    }
+    if (!this.accessToken || !this.idToken) return null;
     return {
       AccessToken: this.accessToken,
       IdToken: this.idToken,
@@ -104,7 +99,7 @@ export class AuthService {
         body: JSON.stringify(data),
       });
 
-      if ('tokens' in response && response.tokens) {
+      if (response.tokens) {
         localStorage.setItem('TempAccessToken', response.tokens.AccessToken);
         localStorage.setItem('TempIdToken', response.tokens.IdToken);
         if (response.tokens.RefreshToken) {
@@ -126,7 +121,7 @@ export class AuthService {
         throw new Error('No temporary access token found. Please register again.');
       }
 
-      const response = await this.apiService.request<{ tokens?: AuthTokens }>(
+      const response = await this.apiService.request<{ tokens: AuthTokens }>(
         `${API_ENDPOINTS.AUTH.VERIFY}?code=${code}`,
         {
           method: 'POST',
@@ -173,8 +168,10 @@ export class AuthService {
         body: JSON.stringify({ email, password }),
       });
 
-      if ('tokens' in response && response.tokens) {
+      if (response.tokens) {
         this.setTokens(response.tokens);
+        this.username = response.username;
+        this.email = response.email;
       } else {
         throw new Error('No tokens received');
       }
@@ -186,13 +183,18 @@ export class AuthService {
 
   public async logout(): Promise<void> {
     try {
-      await this.apiService.request(API_ENDPOINTS.AUTH.LOGOUT, {
-        method: 'POST',
-      });
+      this.accessToken = null;
+      this.idToken = null;
+      this.refreshToken = null;
+      this.username = null;
+      this.email = null;
+
+      localStorage.removeItem('AccessToken');
+      localStorage.removeItem('IdToken');
+      localStorage.removeItem('RefreshToken');
     } catch (error) {
       console.error('Logout error:', error);
-    } finally {
-      this.clearTokens();
+      throw error;
     }
   }
 
@@ -208,8 +210,8 @@ export class AuthService {
     }
   }
 
-  public getAccessToken(): string | null {
-    return this.accessToken;
+  public isAuthenticated(): boolean {
+    return !!this.accessToken;
   }
 
   public getUsername(): string | null {
@@ -218,30 +220,6 @@ export class AuthService {
 
   public getEmail(): string | null {
     return this.email;
-  }
-
-  private setTokens(tokens: AuthTokens): void {
-    this.accessToken = tokens.AccessToken;
-    this.refreshToken = tokens.RefreshToken;
-    this.idToken = tokens.IdToken;
-    localStorage.setItem('AccessToken', tokens.AccessToken);
-    localStorage.setItem('RefreshToken', tokens.RefreshToken);
-    localStorage.setItem('IdToken', tokens.IdToken);
-  }
-
-  private clearTokens(): void {
-    this.accessToken = null;
-    this.refreshToken = null;
-    this.idToken = null;
-    this.username = null;
-    this.email = null;
-    localStorage.removeItem('AccessToken');
-    localStorage.removeItem('RefreshToken');
-    localStorage.removeItem('IdToken');
-  }
-
-  public isAuthenticated(): boolean {
-    return !!this.accessToken && !!this.idToken;
   }
 
   public parseToken(token: string): TokenClaims | null {
@@ -254,36 +232,26 @@ export class AuthService {
           .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
           .join('')
       );
-
-      const claims = JSON.parse(jsonPayload);
-      return {
-        sub: claims.sub,
-        email: claims.email,
-        groups: claims['cognito:groups'] || [],
-        exp: claims.exp
-      };
+      return JSON.parse(jsonPayload);
     } catch (error) {
-      console.error('Failed to parse token:', error);
+      console.error('Error parsing token:', error);
       return null;
     }
   }
 
-  public getUserGroups(): string[] {
-    if (!this.idToken) return [];
-    const claims = this.parseToken(this.idToken);
-    return claims?.groups || [];
-  }
-
-  public hasPermission(requiredGroup: string): boolean {
-    const userGroups = this.getUserGroups();
-    return userGroups.includes(requiredGroup);
-  }
-
   public isAdmin(): boolean {
-    return this.hasPermission(environment.COGNITO.USER_GROUPS.ADMIN);
+    if (!this.idToken) return false;
+    const claims = this.parseToken(this.idToken);
+    return claims?.groups?.includes(environment.USER_GROUPS.ADMIN) || false;
   }
 
   public canManageProducts(): boolean {
-    return this.hasPermission(environment.COGNITO.USER_GROUPS.MANAGE_PRODUCT);
+    if (!this.idToken) return false;
+    const claims = this.parseToken(this.idToken);
+    return (
+      claims?.groups?.includes(environment.USER_GROUPS.MANAGE_PRODUCT) ||
+      this.isAdmin() ||
+      false
+    );
   }
 }
