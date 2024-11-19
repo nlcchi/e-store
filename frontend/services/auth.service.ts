@@ -104,7 +104,6 @@ export class AuthService {
         body: JSON.stringify(data),
       });
 
-      // Store temporary tokens for verification if they exist in response
       if ('tokens' in response && response.tokens) {
         localStorage.setItem('TempAccessToken', response.tokens.AccessToken);
         localStorage.setItem('TempIdToken', response.tokens.IdToken);
@@ -131,17 +130,13 @@ export class AuthService {
         `${API_ENDPOINTS.AUTH.VERIFY}?code=${code}`,
         {
           method: 'POST',
-          headers: {
-            Authorization: `Bearer ${tempAccessToken}`,
-          },
+          token: tempAccessToken,
         }
       );
 
       if (response.tokens) {
-        // Store permanent tokens
         this.setTokens(response.tokens);
         
-        // Clean up temporary tokens
         localStorage.removeItem('TempAccessToken');
         localStorage.removeItem('TempIdToken');
         localStorage.removeItem('TempRefreshToken');
@@ -163,9 +158,7 @@ export class AuthService {
 
       await this.apiService.request(API_ENDPOINTS.AUTH.VERIFY, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${tempAccessToken}`,
-        },
+        token: tempAccessToken,
       });
     } catch (error) {
       console.error('Failed to resend verification code:', error);
@@ -180,13 +173,11 @@ export class AuthService {
         body: JSON.stringify({ email, password }),
       });
 
-      this.setTokens({
-        AccessToken: response.accessToken,
-        RefreshToken: response.refreshToken,
-        IdToken: response.accessToken // Using accessToken as IdToken for now
-      });
-      this.username = response.username;
-      this.email = response.email;
+      if ('tokens' in response && response.tokens) {
+        this.setTokens(response.tokens);
+      } else {
+        throw new Error('No tokens received');
+      }
     } catch (error) {
       console.error('Login error:', error);
       throw error;
@@ -209,6 +200,7 @@ export class AuthService {
     try {
       return await this.apiService.request<ProfileResponse>(API_ENDPOINTS.AUTH.PROFILE, {
         method: 'GET',
+        token: this.getAccessToken(),
       });
     } catch (error) {
       console.error('Get profile error:', error);

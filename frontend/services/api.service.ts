@@ -44,8 +44,11 @@ interface Product {
 
 export class ApiService {
   private static instance: ApiService;
+  private baseUrl: string;
 
-  private constructor() {}
+  private constructor() {
+    this.baseUrl = environment.API_BASE_URL;
+  }
 
   public static getInstance(): ApiService {
     if (!ApiService.instance) {
@@ -54,31 +57,40 @@ export class ApiService {
     return ApiService.instance;
   }
 
-  public async request<T>(url: string, options: RequestInit = {}): Promise<T> {
-    const authService = AuthService.getInstance();
-    const token = authService.getAccessToken();
+  private getFullUrl(path: string): string {
+    return `${this.baseUrl}${path}`;
+  }
 
+  public async request<T>(
+    url: string, 
+    options: RequestInit & { token?: string } = {}
+  ): Promise<T> {
+    const { token, ...restOptions } = options;
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
-      ...options.headers,
+      ...restOptions.headers,
     };
 
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${environment.API_BASE_URL}${url}`, {
-      ...options,
+    const response = await fetch(this.getFullUrl(url), {
+      ...restOptions,
       headers,
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorData = await response.json().catch(() => null);
+      const error = new Error(
+        errorData?.message || `HTTP error! status: ${response.status}`
+      );
+      throw error;
     }
 
-    // Handle 204 No Content
+    // For 204 No Content responses, return null
     if (response.status === 204) {
-      return {} as T;
+      return null as T;
     }
 
     return response.json();
