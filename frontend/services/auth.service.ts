@@ -72,7 +72,7 @@ export class AuthService {
       if (tokens) {
         const parsed = JSON.parse(tokens);
         this.accessToken = parsed.accessToken;
-        this.refreshToken = parsed.refreshToken;
+        this.refreshToken = parsed.refreshToken ?? null;
         this.idToken = parsed.idToken;
       }
     } catch (error) {
@@ -87,7 +87,7 @@ export class AuthService {
     }
 
     this.accessToken = tokens.AccessToken;
-    this.refreshToken = tokens.RefreshToken;
+    this.refreshToken = tokens.RefreshToken ?? null;
     this.idToken = tokens.IdToken;
 
     try {
