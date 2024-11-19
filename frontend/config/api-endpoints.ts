@@ -7,6 +7,7 @@ export const API_ENDPOINTS = {
     LOGOUT: '/v1/logout',
     REFRESH: '/v1/refresh',
     PROFILE: '/v1/profile',
+    VERIFY: '/v1/verify',
   } as const,
   
   PRODUCTS: {
