@@ -8,63 +8,52 @@ import { Button } from "@/components/ui/button";
 import { ShoppingCart } from "lucide-react";
 import { useCart } from "@/lib/cart-context";
 import { useToast } from "@/components/ui/use-toast";
+import { apiService } from '@/services/api.service';
 
 interface ProductGridProps {
   initialProducts?: Product[];
   filters?: ProductFilters;
 }
 
+interface ProductResponse {
+  queryResult: Product[];
+  lastKey?: {
+    id: {
+      S: string;
+    };
+  };
+}
+
 export default function ProductGrid({ initialProducts = [], filters }: ProductGridProps) {
-  const [products, setProducts] = useState<Product[]>(initialProducts);
-  const [loading, setLoading] = useState(!initialProducts.length);
-  const [error, setError] = useState<string | null>(null);
+  const [products, setProducts] = useState<Product[]>(initialProducts || []);
   const [lastKey, setLastKey] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const { dispatch } = useCart();
   const { toast } = useToast();
 
   useEffect(() => {
     const fetchProducts = async () => {
-      // Don't fetch if we already have initial products
-      if (initialProducts.length > 0) return;
-      
       try {
         setLoading(true);
-        const url = new URL('/api/products', window.location.origin);
-        
-        // Add filters as query parameters
-        if (filters) {
-          Object.entries(filters).forEach(([key, value]) => {
-            if (value) url.searchParams.append(key, value.toString());
-          });
-        }
+        setError(null);
 
-        const response = await fetch(url.toString(), {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
+        console.log('Fetching products...');
+        const data = await apiService.listProducts();
+        console.log('Products response:', data);
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        
-        if (Array.isArray(data)) {
-          setProducts(data);
-          setError(null);
-        } else if (data.queryResult && Array.isArray(data.queryResult)) {
-          setProducts(data.queryResult);
-          setLastKey(data.lastKey?.id?.S || null);
-          setError(null);
+        if (data && 'queryResult' in data) {
+          const response = data as ProductResponse;
+          setProducts(response.queryResult);
+          setLastKey(response.lastKey?.id?.S || null);
         } else {
-          throw new Error('Invalid response format');
+          console.error('Invalid data format:', data);
+          throw new Error('Invalid data format received from server');
         }
-      } catch (err) {
-        setError('Failed to fetch products. Please try again later.');
-        console.error('Error fetching products:', err);
+      } catch (error) {
+        console.error('Error fetching products:', error);
+        setError(error instanceof Error ? error.message : 'Failed to fetch products');
         setProducts([]); // Reset products on error
       } finally {
         setLoading(false);

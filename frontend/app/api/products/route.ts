@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
     const filters = Object.fromEntries(searchParams.entries());
 
     const apiUrl = new URL(`${environment.API_BASE_URL}${API_ENDPOINTS.PRODUCTS.LIST}`);
+    
     // Add filters as query parameters
     Object.entries(filters).forEach(([key, value]) => {
       apiUrl.searchParams.append(key, value);
@@ -45,63 +46,130 @@ export async function GET(request: NextRequest) {
     const headersList = headers();
     const authHeader = headersList.get('Authorization');
 
+    console.log('Proxying request to:', apiUrl.toString());
+
     const response = await fetch(apiUrl.toString(), {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        ...(authHeader ? { Authorization: authHeader } : {}),
+        'Accept': 'application/json',
+        ...(authHeader ? { 'Authorization': authHeader } : {}),
       },
+      cache: 'no-store',
     });
 
     if (!response.ok) {
-      throw new Error(`API request failed: ${response.statusText}`);
+      const errorText = await response.text();
+      console.error('API Error:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText
+      });
+      
+      return new NextResponse(JSON.stringify({
+        error: 'Failed to fetch products',
+        details: errorText
+      }), {
+        status: response.status,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+      });
     }
 
     const data = await response.json();
-    return corsResponse(new NextResponse(JSON.stringify(data), {
+    return new NextResponse(JSON.stringify(data), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    }));
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
+    });
+
   } catch (error) {
-    console.error('Error fetching products:', error);
-    return corsResponse(new NextResponse(
-      JSON.stringify({ error: 'Failed to fetch products' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    ));
+    console.error('Products API Error:', error);
+    return new NextResponse(JSON.stringify({
+      error: 'Internal Server Error',
+      message: error instanceof Error ? error.message : 'Unknown error occurred'
+    }), {
+      status: 500,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
+    });
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const apiUrl = `${environment.API_BASE_URL}${API_ENDPOINTS.PRODUCTS.CREATE}`;
-    
     const headersList = headers();
     const authHeader = headersList.get('Authorization');
 
-    const response = await fetch(apiUrl, {
+    if (!authHeader) {
+      return new NextResponse(JSON.stringify({
+        error: 'Authorization required'
+      }), {
+        status: 401,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+      });
+    }
+
+    const response = await fetch(`${environment.API_BASE_URL}${API_ENDPOINTS.PRODUCTS.CREATE}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(authHeader ? { Authorization: authHeader } : {}),
+        'Accept': 'application/json',
+        'Authorization': authHeader,
       },
       body: JSON.stringify(body),
     });
 
     if (!response.ok) {
-      throw new Error(`API request failed: ${response.statusText}`);
+      const errorText = await response.text();
+      console.error('API Error:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText
+      });
+      
+      return new NextResponse(JSON.stringify({
+        error: 'Failed to create product',
+        details: errorText
+      }), {
+        status: response.status,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+      });
     }
 
-    const result = await response.json();
-    return corsResponse(new NextResponse(JSON.stringify(result), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    }));
+    const data = await response.json();
+    return new NextResponse(JSON.stringify(data), {
+      status: 201,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
+    });
+
   } catch (error) {
-    console.error('Error in products POST:', error);
-    return corsResponse(new NextResponse(
-      JSON.stringify({ error: 'Failed to process product request' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    ));
+    console.error('Products API Error:', error);
+    return new NextResponse(JSON.stringify({
+      error: 'Internal Server Error',
+      message: error instanceof Error ? error.message : 'Unknown error occurred'
+    }), {
+      status: 500,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
+    });
   }
 }

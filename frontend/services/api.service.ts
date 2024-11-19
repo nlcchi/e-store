@@ -184,7 +184,7 @@ export class ApiService {
 
   public async listProducts(): Promise<Product[]> {
     return this.request<Product[]>(API_ENDPOINTS.PRODUCTS.LIST, {
-      method: 'GET',
+      method: 'POST',
     });
   }
 
