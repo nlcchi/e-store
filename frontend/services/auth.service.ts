@@ -35,6 +35,8 @@ interface TokenClaims {
   exp: number;
 }
 
+const STORAGE_KEY = 'auth-tokens';
+
 export class AuthService {
   private static instance: AuthService;
   private apiService: ApiService;
@@ -57,20 +59,59 @@ export class AuthService {
   }
 
   private loadTokens(): void {
-    this.accessToken = localStorage.getItem('AccessToken');
-    this.idToken = localStorage.getItem('IdToken');
-    this.refreshToken = localStorage.getItem('RefreshToken');
+    if (typeof window === 'undefined') {
+      // Server-side, no tokens available
+      this.accessToken = null;
+      this.refreshToken = null;
+      this.idToken = null;
+      return;
+    }
+
+    try {
+      const tokens = localStorage.getItem(STORAGE_KEY);
+      if (tokens) {
+        const parsed = JSON.parse(tokens);
+        this.accessToken = parsed.accessToken;
+        this.refreshToken = parsed.refreshToken;
+        this.idToken = parsed.idToken;
+      }
+    } catch (error) {
+      console.error('Failed to load tokens:', error);
+      this.clearTokens();
+    }
   }
 
   private setTokens(tokens: AuthTokens): void {
-    this.accessToken = tokens.AccessToken;
-    this.idToken = tokens.IdToken;
-    this.refreshToken = tokens.RefreshToken || null;
+    if (typeof window === 'undefined') {
+      return; // Don't try to use localStorage on server
+    }
 
-    localStorage.setItem('AccessToken', tokens.AccessToken);
-    localStorage.setItem('IdToken', tokens.IdToken);
-    if (tokens.RefreshToken) {
-      localStorage.setItem('RefreshToken', tokens.RefreshToken);
+    this.accessToken = tokens.AccessToken;
+    this.refreshToken = tokens.RefreshToken;
+    this.idToken = tokens.IdToken;
+
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        accessToken: this.accessToken,
+        refreshToken: this.refreshToken,
+        idToken: this.idToken
+      }));
+    } catch (error) {
+      console.error('Failed to save tokens:', error);
+    }
+  }
+
+  private clearTokens(): void {
+    this.accessToken = null;
+    this.refreshToken = null;
+    this.idToken = null;
+
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch (error) {
+        console.error('Failed to clear tokens:', error);
+      }
     }
   }
 
@@ -191,15 +232,7 @@ export class AuthService {
 
   public async logout(): Promise<void> {
     try {
-      this.accessToken = null;
-      this.idToken = null;
-      this.refreshToken = null;
-      this.username = null;
-      this.email = null;
-
-      localStorage.removeItem('AccessToken');
-      localStorage.removeItem('IdToken');
-      localStorage.removeItem('RefreshToken');
+      this.clearTokens();
     } catch (error) {
       console.error('Logout error:', error);
       throw error;
