@@ -6,6 +6,9 @@ export interface Product {
   category: string;
   stock: number;
   imageUrl?: string;
+  image_1?: boolean | null;
+  image_2?: boolean | null;
+  image_3?: boolean | null;
   createdAt: number;
   updatedAt?: number;
 }

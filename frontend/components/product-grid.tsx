@@ -54,52 +54,24 @@ export default function ProductGrid({ initialProducts = [], filters }: ProductGr
     fetchProducts();
   }, [filters, initialProducts.length]);
 
-  const addToCart = (product: Product) => {
+  const handleAddToCart = (product: Product) => {
     dispatch({
-      type: "ADD_ITEM",
+      type: 'ADD_TO_CART',
       payload: {
         id: product.id,
         name: product.name,
         price: product.price,
-        image: product.image_1 ? `/images/products/${product.id}_1.jpg` : '/images/placeholder.jpg',
+        image: product.image_1 ? `/images/products/${product.id}_1.jpg` : product.imageUrl || '/images/placeholder.jpg',
       },
     });
     toast({
-      title: "Added to Cart",
+      title: "Added to cart",
       description: `${product.name} has been added to your cart.`,
     });
   };
 
-  if (loading) {
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {[...Array(8)].map((_, i) => (
-          <Card key={i} className="animate-pulse">
-            <div className="h-48 bg-gray-200 rounded-t-lg" />
-            <CardContent className="p-4">
-              <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
-              <div className="h-4 bg-gray-200 rounded w-1/2" />
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="text-center py-10">
-        <p className="text-red-500">{error}</p>
-        <Button
-          variant="outline"
-          onClick={() => window.location.reload()}
-          className="mt-4"
-        >
-          Try Again
-        </Button>
-      </div>
-    );
-  }
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error}</div>;
 
   if (!products.length) {
     return (
@@ -110,34 +82,32 @@ export default function ProductGrid({ initialProducts = [], filters }: ProductGr
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
       {products.map((product) => (
-        <Card key={product.id} className="flex flex-col">
-          <div className="relative h-48 bg-gray-100 rounded-t-lg">
-            {product.image_1 ? (
+        <Card key={product.id} className="overflow-hidden">
+          <CardContent className="p-0">
+            <div className="relative h-48 w-full">
               <Image
-                src={product.image_1 ? `/images/products/${product.id}_1.jpg` : '/images/placeholder.jpg'}
+                src={product.image_1 ? `/images/products/${product.id}_1.jpg` : product.imageUrl || '/images/placeholder.jpg'}
                 alt={product.name}
                 fill
-                className="object-cover rounded-t-lg"
+                className="object-cover"
               />
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center text-gray-400">
-                No image available
+            </div>
+            <div className="p-4">
+              <h3 className="text-lg font-semibold">{product.name}</h3>
+              <p className="text-sm text-gray-600 mt-1">{product.description}</p>
+              <div className="mt-2 flex justify-between items-center">
+                <span className="text-lg font-bold">${product.price.toFixed(2)}</span>
+                <span className="text-sm text-gray-500">Stock: {product.stock}</span>
               </div>
-            )}
-          </div>
-          <CardContent className="flex-grow p-4">
-            <h3 className="font-semibold mb-2">{product.name}</h3>
-            <p className="text-sm text-gray-600 mb-2">{product.description}</p>
-            <p className="text-lg font-bold">${product.price.toFixed(2)}</p>
-            <p className="text-sm text-gray-500">Stock: {product.stock}</p>
+            </div>
           </CardContent>
-          <CardFooter className="p-4 pt-0">
-            <Button
-              className="w-full"
-              onClick={() => addToCart(product)}
-              disabled={product.stock === 0}
+          <CardFooter className="p-4">
+            <Button 
+              className="w-full" 
+              onClick={() => handleAddToCart(product)}
+              disabled={product.stock <= 0}
             >
               <ShoppingCart className="mr-2 h-4 w-4" />
               Add to Cart
