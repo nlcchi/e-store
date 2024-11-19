@@ -33,7 +33,7 @@ export class AuthService {
   private apiService: ApiService;
 
   private constructor() {
-    this.apiService = new ApiService();
+    this.apiService = ApiService.getInstance();
   }
 
   public static getInstance(): AuthService {
