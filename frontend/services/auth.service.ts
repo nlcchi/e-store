@@ -198,70 +198,20 @@ export class AuthService {
     }
   }
 
-  public async login(email: string, password: string): Promise<UserClaims> {
-    try {
-      console.log('Attempting login with:', { identity: email });
-      
-      // Validate inputs before making request
-      if (!email || !password) {
-        throw new AuthError('Email and password are required');
+  public async login(username: string, password: string): Promise<{
+    tokens: AuthTokens;
+    username: string;
+  }> {
+    return this.apiService.request(
+      API_ENDPOINTS.AUTH.LOGIN,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          username,
+          password,
+        }),
       }
-
-      const response = await this.apiService.login({ 
-        identity: email.trim().toLowerCase(),
-        password 
-      });
-      
-      console.log('Login response:', {
-        hasTokens: !!response?.tokens,
-        tokenKeys: response?.tokens ? Object.keys(response.tokens) : [],
-      });
-
-      if (!response || !response.tokens) {
-        console.error('Invalid login response:', response);
-        throw new AuthError('Invalid response from server');
-      }
-
-      if (!this.validateTokenResponse(response.tokens)) {
-        console.error('Invalid token response:', response.tokens);
-        throw new AuthError('Invalid token response from server');
-      }
-
-      // Parse and log token information before storing
-      const idTokenClaims = this.parseToken(response.tokens.IdToken);
-      if (!idTokenClaims) {
-        throw new AuthError('Failed to parse ID token');
-      }
-
-      console.log('Token claims:', {
-        sub: idTokenClaims.sub,
-        groups: idTokenClaims.groups,
-        exp: idTokenClaims.exp
-      });
-
-      this.setTokens(response.tokens);
-      
-      // Verify tokens were stored
-      const storedTokens = this.getTokens();
-      console.log('Stored tokens verification:', {
-        hasAccessToken: !!storedTokens?.AccessToken,
-        hasIdToken: !!storedTokens?.IdToken,
-        hasRefreshToken: !!storedTokens?.RefreshToken,
-        groups: this.getUserGroup()
-      });
-
-      return idTokenClaims;
-    } catch (error) {
-      console.error('Login failed:', error);
-      
-      // Provide more specific error messages
-      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-        throw new AuthError('Unable to connect to authentication service. Please check your internet connection.', 'NETWORK_ERROR');
-      }
-      
-      const message = error instanceof Error ? error.message : 'Login failed';
-      throw new AuthError(message, error instanceof AuthError ? error.code : 'LOGIN_FAILED');
-    }
+    );
   }
 
   public async logout(): Promise<void> {

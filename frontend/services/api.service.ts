@@ -75,7 +75,7 @@ export class ApiService {
     });
   }
 
-  private async request(
+  private async request<T = any>(
     endpoint: string,
     options: {
       method?: string;
@@ -84,7 +84,7 @@ export class ApiService {
       credentials?: RequestCredentials;
       requiresAuth?: boolean;
     } = {}
-  ): Promise<any> {
+  ): Promise<T> {
     const url = this.getFullUrl(endpoint);
     
     // Ensure headers and CORS settings are set
@@ -104,12 +104,12 @@ export class ApiService {
         credentials: 'include',
       });
 
-      let data;
+      let data: T;
       const contentType = response.headers.get('content-type');
       if (contentType && contentType.includes('application/json')) {
         data = await response.json();
       } else {
-        data = await response.text();
+        data = await response.text() as T;
       }
 
       this.logResponse({
@@ -117,21 +117,21 @@ export class ApiService {
         data: typeof data === 'object' ? {
           ...data,
           // Redact sensitive data
-          accessToken: data?.accessToken ? '[REDACTED]' : undefined,
-          AccessToken: data?.AccessToken ? '[REDACTED]' : undefined,
-          idToken: data?.idToken ? '[REDACTED]' : undefined,
-          IdToken: data?.IdToken ? '[REDACTED]' : undefined,
-          refreshToken: data?.refreshToken ? '[REDACTED]' : undefined,
-          RefreshToken: data?.RefreshToken ? '[REDACTED]' : undefined,
-          sessionToken: data?.sessionToken ? '[REDACTED]' : undefined,
-          SessionToken: data?.SessionToken ? '[REDACTED]' : undefined,
-          password: data?.password ? '[REDACTED]' : undefined,
-          code: data?.code ? '[REDACTED]' : undefined
+          accessToken: (data as any)?.accessToken ? '[REDACTED]' : undefined,
+          AccessToken: (data as any)?.AccessToken ? '[REDACTED]' : undefined,
+          idToken: (data as any)?.idToken ? '[REDACTED]' : undefined,
+          IdToken: (data as any)?.IdToken ? '[REDACTED]' : undefined,
+          refreshToken: (data as any)?.refreshToken ? '[REDACTED]' : undefined,
+          RefreshToken: (data as any)?.RefreshToken ? '[REDACTED]' : undefined,
+          sessionToken: (data as any)?.sessionToken ? '[REDACTED]' : undefined,
+          SessionToken: (data as any)?.SessionToken ? '[REDACTED]' : undefined,
+          password: (data as any)?.password ? '[REDACTED]' : undefined,
+          code: (data as any)?.code ? '[REDACTED]' : undefined
         } : data
       });
 
       if (!response.ok) {
-        throw new Error(data?.message || 'API request failed');
+        throw new Error((data as any)?.message || 'API request failed');
       }
 
       return data;
