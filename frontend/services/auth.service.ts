@@ -92,109 +92,84 @@ export class AuthService {
     };
   }
 
-  public async register(
-    username: string,
-    email: string,
-    password: string,
-    gender: string
-  ): Promise<RegisterResponse> {
+  public async register(data: { 
+    username: string; 
+    email: string; 
+    password: string; 
+    gender: string;
+  }): Promise<RegisterResponse> {
     try {
-      // Validate inputs
-      if (username.length < 3 || username.includes(' ')) {
-        throw new AuthError('Username must be at least 3 characters and contain no spaces.');
-      }
-      
-      if (!['male', 'female'].includes(gender.toLowerCase())) {
-        throw new AuthError('Gender must be either "male" or "female".');
-      }
-
-      // Validate password
-      if (password.length < 8) {
-        throw new AuthError('Password must be at least 8 characters long.');
-      }
-
-      if (!/[A-Z]/.test(password)) {
-        throw new AuthError('Password must contain at least one uppercase letter.');
-      }
-
-      if (!/[a-z]/.test(password)) {
-        throw new AuthError('Password must contain at least one lowercase letter.');
-      }
-
-      if (!/[0-9]/.test(password)) {
-        throw new AuthError('Password must contain at least one number.');
-      }
-
-      if (!/[@$!%*?&]/.test(password)) {
-        throw new AuthError('Password must contain at least one special character (@$!%*?&).');
-      }
-
-      console.log('Registering user:', { username, email, gender });
-      
-      // Format request according to API requirements
-      const requestBody = {
-        username: username.toLowerCase().trim(),
-        email: email.toLowerCase().trim(),
-        password,
-        gender: gender.toLowerCase(),
-        clientId: environment.COGNITO.CLIENT_ID
-      };
-
-      console.log('Sending registration request:', {
-        ...requestBody,
-        password: '[REDACTED]',
-        clientId: requestBody.clientId
-      });
-
       const response = await this.apiService.request<RegisterResponse>(API_ENDPOINTS.AUTH.REGISTER, {
         method: 'POST',
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify(data),
       });
 
-      console.log('Raw registration response:', response);
+      // Store temporary tokens for verification if they exist in response
+      if ('tokens' in response && response.tokens) {
+        localStorage.setItem('TempAccessToken', response.tokens.AccessToken);
+        localStorage.setItem('TempIdToken', response.tokens.IdToken);
+        if (response.tokens.RefreshToken) {
+          localStorage.setItem('TempRefreshToken', response.tokens.RefreshToken);
+        }
+      }
 
       return response;
     } catch (error) {
-      console.error('Registration failed:', error);
-      
-      if (error instanceof AuthError) {
-        throw error;
+      console.error('Registration error:', error);
+      throw error;
+    }
+  }
+
+  public async verifyEmail(username: string, code: string): Promise<void> {
+    try {
+      const tempAccessToken = localStorage.getItem('TempAccessToken');
+      if (!tempAccessToken) {
+        throw new Error('No temporary access token found. Please register again.');
       }
-      
-      // Handle specific error cases
-      if (error && typeof error === 'object') {
-        // Extract error message
-        let errorMessage = '';
-        if ('message' in error) {
-          errorMessage = String(error.message);
-        } else if ('error' in error) {
-          errorMessage = String(error.error);
+
+      const response = await this.apiService.request<{ tokens?: AuthTokens }>(
+        `${API_ENDPOINTS.AUTH.VERIFY}?code=${code}`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${tempAccessToken}`,
+          },
         }
-        
-        // Check for specific error conditions
-        const lowerErrorMessage = errorMessage.toLowerCase();
-        if (lowerErrorMessage.includes('email exists') || 
-            lowerErrorMessage.includes('emailexistsexception')) {
-          throw new AuthError('This email is already registered. Please use a different email or try logging in.');
-        } else if (lowerErrorMessage.includes('username exists')) {
-          throw new AuthError('This username is already taken. Please choose a different username.');
-        } else if (lowerErrorMessage.includes('password')) {
-          throw new AuthError('Password must be at least 8 characters long and contain uppercase, lowercase, numbers and special characters.');
-        } else if (lowerErrorMessage.includes('invalid')) {
-          throw new AuthError('Please check your input values and try again.');
-        } else {
-          // If we have an error message, use it
-          if (errorMessage) {
-            throw new AuthError(`Registration failed: ${errorMessage}`);
-          }
-        }
-      }
-      
-      // Default error message
-      throw new AuthError(
-        'Registration failed. Please try again.',
-        'REGISTRATION_FAILED'
       );
+
+      if (response.tokens) {
+        // Store permanent tokens
+        this.setTokens(response.tokens);
+        
+        // Clean up temporary tokens
+        localStorage.removeItem('TempAccessToken');
+        localStorage.removeItem('TempIdToken');
+        localStorage.removeItem('TempRefreshToken');
+      } else {
+        throw new Error('No tokens received after verification');
+      }
+    } catch (error) {
+      console.error('Email verification error:', error);
+      throw error;
+    }
+  }
+
+  public async resendVerificationCode(username: string): Promise<void> {
+    try {
+      const tempAccessToken = localStorage.getItem('TempAccessToken');
+      if (!tempAccessToken) {
+        throw new Error('No temporary access token found. Please register again.');
+      }
+
+      await this.apiService.request(API_ENDPOINTS.AUTH.VERIFY, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tempAccessToken}`,
+        },
+      });
+    } catch (error) {
+      console.error('Failed to resend verification code:', error);
+      throw error;
     }
   }
 
