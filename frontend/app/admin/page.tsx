@@ -4,7 +4,14 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Trash2, Upload, Plus, Pencil, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -67,12 +74,11 @@ export default function AdminPage() {
         name: formData.get('name') as string,
         description: formData.get('description') as string,
         price: parseFloat(formData.get('price') as string),
-        category: formData.get('category') as string || 'general', // Default category
+        category: formData.get('category') as string || 'general',
       };
 
       const newProduct = await apiService.createProduct(productData);
       
-      // If there's an image, upload it
       if (imageFile && newProduct.id) {
         const imageUrl = await handleImageUpload(newProduct.id, imageFile);
         newProduct.imageUrl = imageUrl;
@@ -129,7 +135,7 @@ export default function AdminPage() {
               Add Product
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-lg bg-white">
+          <DialogContent>
             <DialogHeader>
               <DialogTitle>Add New Product</DialogTitle>
               <DialogDescription>
@@ -147,30 +153,30 @@ export default function AdminPage() {
               </div>
               <div>
                 <Label htmlFor="price">Price</Label>
-                <Input 
-                  id="price" 
-                  name="price" 
-                  type="number" 
-                  step="0.01" 
-                  min="0" 
-                  required 
+                <Input
+                  id="price"
+                  name="price"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  required
                 />
               </div>
               <div>
                 <Label htmlFor="category">Category</Label>
-                <Input 
-                  id="category" 
-                  name="category" 
+                <Input
+                  id="category"
+                  name="category"
                   placeholder="e.g., Electronics, Clothing, etc."
-                  required 
+                  required
                 />
               </div>
               <div>
-                <Label htmlFor="image">Image</Label>
-                <Input 
-                  id="image" 
-                  name="image" 
-                  type="file" 
+                <Label htmlFor="image">Product Image</Label>
+                <Input
+                  id="image"
+                  name="image"
+                  type="file"
                   accept="image/*"
                   onChange={(e) => setImageFile(e.target.files?.[0] || null)}
                 />
@@ -204,13 +210,13 @@ export default function AdminPage() {
             {products.map((product) => (
               <TableRow key={product.id}>
                 <TableCell>
-                  <div className="relative w-16 h-16">
+                  <div className="relative h-20 w-20">
                     {product.imageUrl ? (
                       <>
                         <img
                           src={product.imageUrl}
                           alt={product.name}
-                          className="w-full h-full object-cover rounded"
+                          className="h-full w-full object-cover rounded-md"
                         />
                         <Button
                           variant="destructive"
@@ -222,7 +228,7 @@ export default function AdminPage() {
                         </Button>
                       </>
                     ) : (
-                      <div className="w-full h-full bg-gray-100 rounded flex items-center justify-center">
+                      <div className="flex h-full w-full items-center justify-center bg-gray-100 rounded-md">
                         <Upload className="h-6 w-6 text-gray-400" />
                       </div>
                     )}
