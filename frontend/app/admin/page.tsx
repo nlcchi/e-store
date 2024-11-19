@@ -99,10 +99,7 @@ export default function AdminPage() {
     try {
       const authService = AuthService.getInstance();
       const token = authService.getAccessToken();
-      if (!token) {
-        throw new Error('No access token found');
-      }
-
+      
       const result = await apiService.uploadProductImage(productId, file, token);
       toast.success('Image uploaded successfully');
       return result.imageUrl;

@@ -11,7 +11,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 
 const loginSchema = z.object({
-  email: z.string().email('Please enter a valid email'),
+  username: z.string().min(3, 'Username must be at least 3 characters'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
 });
 
@@ -32,7 +32,7 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginForm) => {
     try {
       setIsLoading(true);
-      await login(data.email, data.password);
+      await login(data.username, data.password);
     } catch (error) {
       console.error('Login failed:', error);
     } finally {
@@ -52,16 +52,16 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="username">Username</Label>
             <Input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
+              id="username"
+              type="text"
+              placeholder="Enter your username"
               disabled={isLoading}
-              {...register('email')}
+              {...register('username')}
             />
-            {errors.email && (
-              <p className="text-sm text-red-500">{errors.email.message}</p>
+            {errors.username && (
+              <p className="text-sm text-red-500">{errors.username.message}</p>
             )}
           </div>
 
@@ -70,6 +70,7 @@ export default function LoginPage() {
             <Input
               id="password"
               type="password"
+              placeholder="Enter your password"
               disabled={isLoading}
               {...register('password')}
             />

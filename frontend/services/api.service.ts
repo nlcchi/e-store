@@ -67,7 +67,7 @@ export class ApiService {
 
   public async request<T>(
     url: string, 
-    options: RequestInit & { token?: string; skipContentType?: boolean } = {}
+    options: RequestInit & { token?: string | null; skipContentType?: boolean } = {}
   ): Promise<T> {
     const { token, skipContentType, ...restOptions } = options;
     const headers = new Headers(restOptions.headers);
@@ -80,17 +80,31 @@ export class ApiService {
       headers.set('Authorization', `Bearer ${token}`);
     }
 
-    const response = await fetch(this.getFullUrl(url), {
+    const fullUrl = this.getFullUrl(url);
+    console.log('Making request to:', fullUrl, {
+      method: options.method,
+      headers: Object.fromEntries(headers.entries()),
+      body: options.body
+    });
+
+    const response = await fetch(fullUrl, {
       ...restOptions,
       headers,
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => null);
-      const error = new Error(
+      const errorData = await response.json().catch(() => ({ message: 'Failed to parse error response' }));
+      console.error('API Error Details:', {
+        status: response.status,
+        statusText: response.statusText,
+        url: fullUrl,
+        errorData,
+        requestBody: options.body,
+        headers: Object.fromEntries(headers.entries())
+      });
+      throw new Error(
         errorData?.message || `HTTP error! status: ${response.status}`
       );
-      throw error;
     }
 
     // For 204 No Content responses, return null
@@ -180,9 +194,13 @@ export class ApiService {
   public async uploadProductImage(
     productId: string,
     file: File,
-    token: string
+    token: string | null
   ): Promise<ImageUploadResponse> {
     try {
+      if (!token) {
+        throw new Error('Authentication required');
+      }
+
       const formData = new FormData();
       formData.append('image', file);
 
