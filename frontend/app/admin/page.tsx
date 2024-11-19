@@ -1,7 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { Trash2, Upload, Plus, Pencil, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { environment } from "@/config/environment";
+import { API_ENDPOINTS } from "@/config/api-endpoints";
+import { apiService } from "@/services/api.service";
+import { AuthService } from "@/services/auth.service";
 import {
   Table,
   TableBody,
@@ -10,23 +20,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { useToast } from "@/components/ui/use-toast";
-import { Loader2, Pencil, Trash2, Upload, Plus } from "lucide-react";
-import { AuthService } from "@/services/auth.service";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { environment } from "@/config/environment";
-import { API_ENDPOINTS } from "@/config/api-endpoints";
-import { apiService } from "@/services/api.service";
 
 interface Product {
   id: string;
@@ -38,69 +31,41 @@ interface Product {
 
 export default function AdminPage() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
   const authService = AuthService.getInstance();
 
-  // Fetch products
   useEffect(() => {
     fetchProducts();
   }, []);
 
   const fetchProducts = async () => {
     try {
-      const response = await fetch(`${environment.API_BASE_URL}${API_ENDPOINTS.PRODUCTS.LIST}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (!response.ok) throw new Error('Failed to fetch products');
-      
-      const data = await response.json();
-      console.log(data);
-      setProducts(data.queryResult || []);
+      const products = await apiService.listProducts();
+      setProducts(products);
     } catch (error) {
       console.error('Error fetching products:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch products. Please try again.",
-        variant: "destructive",
-      });
+      toast.error('Failed to fetch products');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCreateProduct = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     setLoading(true);
 
+    const formData = new FormData(event.currentTarget);
+
     try {
-      const formData = new FormData(e.currentTarget);
       const productData = {
         name: formData.get('name') as string,
         description: formData.get('description') as string,
         price: parseFloat(formData.get('price') as string),
       };
 
-      const accessToken = authService.getAccessToken();
-      const response = await fetch(`${environment.API_BASE_URL}${API_ENDPOINTS.PRODUCTS.CREATE}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify(productData),
-      });
-
-      if (!response.ok) throw new Error('Failed to create product');
-
-      const newProduct = await response.json();
+      const newProduct = await apiService.createProduct(productData);
       
       // If there's an image, upload it
       if (imageFile && newProduct.id) {
@@ -108,20 +73,12 @@ export default function AdminPage() {
         newProduct.imageUrl = imageUrl;
       }
 
-      toast({
-        title: "Success",
-        description: "Product created successfully!",
-      });
-
+      toast.success('Product created successfully!');
       setIsDialogOpen(false);
-      setProducts([...products, newProduct]); // Refresh the product list
+      setProducts([...products, newProduct]);
     } catch (error) {
       console.error('Error creating product:', error);
-      toast({
-        title: "Error",
-        description: "Failed to create product. Please try again.",
-        variant: "destructive",
-      });
+      toast.error('Failed to create product');
     } finally {
       setLoading(false);
     }
@@ -146,10 +103,13 @@ export default function AdminPage() {
     try {
       await apiService.deleteProductImage(productId);
       toast.success('Image deleted successfully');
+      const updatedProducts = products.map(p => 
+        p.id === productId ? { ...p, imageUrl: undefined } : p
+      );
+      setProducts(updatedProducts);
     } catch (error) {
       console.error('Image delete error:', error);
       toast.error('Failed to delete image');
-      throw error;
     }
   };
 
@@ -171,7 +131,7 @@ export default function AdminPage() {
                 Fill in the product details below.
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleCreateProduct} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <Label htmlFor="name">Name</Label>
                 <Input id="name" name="name" required />

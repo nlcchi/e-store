@@ -295,3 +295,6 @@ export class ApiService {
 
   // Add other API methods as needed
 }
+
+// Export singleton instance
+export const apiService = ApiService.getInstance();
