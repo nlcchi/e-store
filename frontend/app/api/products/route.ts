@@ -1,23 +1,54 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { environment } from '@/config/environment';
+import { headers } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
+
+// Helper function to handle CORS
+function corsResponse(response: Response) {
+  const headers = new Headers(response.headers);
+  headers.set('Access-Control-Allow-Origin', '*');
+  headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  
+  return new NextResponse(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Max-Age': '86400',
+    },
+  });
+}
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const filters = Object.fromEntries(searchParams.entries());
 
-    const apiUrl = new URL(`${environment.API_BASE_URL}/products`);
+    const apiUrl = new URL(`${environment.API_BASE_URL}/v1/products`);
     // Add filters as query parameters
     Object.entries(filters).forEach(([key, value]) => {
       apiUrl.searchParams.append(key, value);
     });
 
+    const headersList = headers();
+    const authHeader = headersList.get('Authorization');
+
     const response = await fetch(apiUrl.toString(), {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
+        ...(authHeader ? { Authorization: authHeader } : {}),
       },
     });
 
@@ -26,12 +57,15 @@ export async function GET(request: NextRequest) {
     }
 
     const products = await response.json();
-    return NextResponse.json(products);
+    return corsResponse(new NextResponse(JSON.stringify(products), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }));
   } catch (error) {
     console.error('Error fetching products:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch products' },
-      { status: 500 }
-    );
+    return corsResponse(new NextResponse(
+      JSON.stringify({ error: 'Failed to fetch products' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    ));
   }
 }
