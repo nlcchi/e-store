@@ -56,7 +56,7 @@ export default function ProductGrid({ initialProducts = [], filters }: ProductGr
 
   const handleAddToCart = (product: Product) => {
     dispatch({
-      type: 'ADD_TO_CART',
+      type: 'ADD_ITEM',
       payload: {
         id: product.id,
         name: product.name,
