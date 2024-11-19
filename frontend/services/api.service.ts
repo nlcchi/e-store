@@ -48,7 +48,7 @@ export class ApiService {
   private logRequest(
     url: string,
     method: string,
-    headers: Record<string, string>,
+    headers: HeadersInit,
     requestBody?: any
   ) {
     const logData = {
@@ -56,7 +56,7 @@ export class ApiService {
       method,
       headers: {
         ...headers,
-        Cookie: headers?.Cookie ? '[REDACTED]' : undefined
+        cookie: (headers as any).cookie ? '[REDACTED]' : undefined
       },
       body: requestBody ? {
         ...requestBody,
@@ -79,7 +79,7 @@ export class ApiService {
     endpoint: string,
     options: {
       method?: string;
-      headers?: Record<string, string>;
+      headers?: HeadersInit;
       body?: any;
       credentials?: RequestCredentials;
       requiresAuth?: boolean;
@@ -102,7 +102,6 @@ export class ApiService {
         ...options,
         headers,
         credentials: 'include',
-        mode: 'cors'
       });
 
       let data;
@@ -122,59 +121,28 @@ export class ApiService {
           AccessToken: data?.AccessToken ? '[REDACTED]' : undefined,
           idToken: data?.idToken ? '[REDACTED]' : undefined,
           IdToken: data?.IdToken ? '[REDACTED]' : undefined,
-          session: data?.session ? '[REDACTED]' : undefined,
-          Session: data?.Session ? '[REDACTED]' : undefined,
+          refreshToken: data?.refreshToken ? '[REDACTED]' : undefined,
+          RefreshToken: data?.RefreshToken ? '[REDACTED]' : undefined,
+          sessionToken: data?.sessionToken ? '[REDACTED]' : undefined,
+          SessionToken: data?.SessionToken ? '[REDACTED]' : undefined,
+          password: data?.password ? '[REDACTED]' : undefined,
+          code: data?.code ? '[REDACTED]' : undefined
         } : data
       });
 
       if (!response.ok) {
-        console.error('API error details:', {
-          status: response.status,
-          statusText: response.statusText,
-          url,
-          endpoint,
-          error: typeof data === 'object' ? data : { message: data },
-          requestBody: requestBody ? {
-            ...requestBody,
-            password: '[REDACTED]',
-            code: '[REDACTED]'
-          } : undefined
-        });
-
-        // Handle specific error cases
-        if (response.status === 400) {
-          if (typeof data === 'object' && data !== null) {
-            if (data.message) {
-              throw new Error(data.message);
-            } else if (data.error) {
-              throw new Error(data.error);
-            }
-          }
-          throw new Error('Invalid request. Please check your input values.');
-        } else if (response.status === 401) {
-          throw new Error('Authentication failed. Please login again.');
-        } else if (response.status === 403) {
-          throw new Error('You do not have permission to perform this action.');
-        } else if (response.status === 404) {
-          throw new Error('The requested resource was not found.');
-        } else if (response.status === 429) {
-          throw new Error('Too many requests. Please try again later.');
-        }
-
-        throw new Error(`Request failed with status ${response.status}`);
+        throw new Error(data?.message || 'API request failed');
       }
 
       return data;
-    } catch (error) {
-      console.error('API request failed:', {
-        error,
-        endpoint,
+    } catch (error: any) {
+      console.error('API request error:', {
         url,
         request: {
           method: options.method,
           headers: {
             ...headers,
-            Cookie: headers?.Cookie ? '[REDACTED]' : undefined
+            cookie: (headers as any).cookie ? '[REDACTED]' : undefined
           },
           body: options.body ? {
             ...JSON.parse(options.body as string),
@@ -182,9 +150,12 @@ export class ApiService {
             code: '[REDACTED]'
           } : undefined,
           credentials: options.credentials
+        },
+        error: {
+          message: error.message,
+          stack: error.stack
         }
       });
-
       throw error;
     }
   }
