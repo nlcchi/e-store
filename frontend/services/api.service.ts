@@ -66,13 +66,13 @@ export class ApiService {
     options: RequestInit & { token?: string } = {}
   ): Promise<T> {
     const { token, ...restOptions } = options;
-    const headers: HeadersInit = {
+    const headers = new Headers({
       'Content-Type': 'application/json',
-      ...restOptions.headers,
-    };
+      ...(restOptions.headers as Record<string, string>),
+    });
 
     if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
+      headers.set('Authorization', `Bearer ${token}`);
     }
 
     const response = await fetch(this.getFullUrl(url), {
