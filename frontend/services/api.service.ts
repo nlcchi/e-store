@@ -264,14 +264,17 @@ export class ApiService {
   }
 
   public async uploadProductImage(productId: string, formData: FormData): Promise<{ imageUrl: string }> {
-    return this.request<{ imageUrl: string }>(API_ENDPOINTS.PRODUCTS.UPLOAD_IMAGE(productId), {
-      method: 'POST',
-      body: formData,
-      headers: {
-        // Remove Content-Type to let browser set it with boundary for FormData
-        'Content-Type': undefined,
-      },
-    });
+    const url = API_ENDPOINTS.PRODUCTS.UPLOAD_IMAGE(productId);
+    try {
+      const response = await this.request(url, {
+        method: 'POST',
+        body: formData,
+      });
+      return response;
+    } catch (error) {
+      console.error('Error uploading product image:', error);
+      throw error;
+    }
   }
 
   public async deleteProductImage(productId: string): Promise<void> {
