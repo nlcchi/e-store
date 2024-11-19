@@ -45,7 +45,46 @@ export class ApiService {
     return `${this.baseUrl}/${cleanEndpoint}`;
   }
 
-  private async request(endpoint: string, options: RequestInit = {}): Promise<any> {
+  private logRequest(
+    url: string,
+    method: string,
+    headers: Record<string, string>,
+    requestBody?: any
+  ) {
+    const logData = {
+      url,
+      method,
+      headers: {
+        ...headers,
+        Cookie: headers?.Cookie ? '[REDACTED]' : undefined
+      },
+      body: requestBody ? {
+        ...requestBody,
+        password: requestBody.password ? '[REDACTED]' : undefined,
+        code: requestBody.code ? '[REDACTED]' : undefined
+      } : undefined
+    };
+
+    console.log('API Request:', logData);
+  }
+
+  private logResponse(response: any) {
+    console.log('API Response:', {
+      status: response.status,
+      data: response.data
+    });
+  }
+
+  private async request(
+    endpoint: string,
+    options: {
+      method?: string;
+      headers?: Record<string, string>;
+      body?: any;
+      credentials?: RequestCredentials;
+      requiresAuth?: boolean;
+    } = {}
+  ): Promise<any> {
     const url = this.getFullUrl(endpoint);
     
     // Ensure headers and CORS settings are set
@@ -57,20 +96,7 @@ export class ApiService {
 
     try {
       const requestBody = options.body ? JSON.parse(options.body as string) : undefined;
-      console.log(`API request to ${endpoint}:`, {
-        method: options.method,
-        url,
-        headers: {
-          ...headers,
-          Cookie: headers['Cookie'] ? '[REDACTED]' : undefined
-        },
-        body: requestBody ? {
-          ...requestBody,
-          password: requestBody.password ? '[REDACTED]' : undefined,
-          code: requestBody.code ? '[REDACTED]' : undefined
-        } : undefined,
-        credentials: options.credentials
-      });
+      this.logRequest(url, options.method || 'GET', headers, requestBody);
 
       const response = await fetch(url, {
         ...options,
@@ -87,10 +113,8 @@ export class ApiService {
         data = await response.text();
       }
 
-      console.log('API response data:', {
+      this.logResponse({
         status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries()),
         data: typeof data === 'object' ? {
           ...data,
           // Redact sensitive data
@@ -150,7 +174,7 @@ export class ApiService {
           method: options.method,
           headers: {
             ...headers,
-            Cookie: headers['Cookie'] ? '[REDACTED]' : undefined
+            Cookie: headers?.Cookie ? '[REDACTED]' : undefined
           },
           body: options.body ? {
             ...JSON.parse(options.body as string),
