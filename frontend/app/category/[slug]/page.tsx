@@ -23,18 +23,24 @@ export function generateStaticParams() {
 
 async function getCategoryProducts(category: string): Promise<Product[]> {
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_VERCEL_URL || ''}/api/products`, {
-      method: 'POST',
+    const baseUrl = process.env.NEXT_PUBLIC_VERCEL_URL 
+      ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` 
+      : '';
+    
+    const formattedCategory = category
+      .split("-")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" & ")
+      .replace('And', '&');
+
+    const url = new URL(`${baseUrl}/api/products`);
+    url.searchParams.append('category', formattedCategory);
+
+    const response = await fetch(url.toString(), {
+      method: 'GET',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        category: category
-          .split("-")
-          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-          .join(" & ")
-          .replace('And', '&'),
-      }),
       next: { revalidate: 3600 }, // Cache for 1 hour
     });
 
@@ -43,13 +49,7 @@ async function getCategoryProducts(category: string): Promise<Product[]> {
     }
 
     const data = await response.json();
-
-    if (!data.queryResult || !Array.isArray(data.queryResult)) {
-      console.error('Invalid products response format');
-      return [];
-    }
-
-    return data.queryResult;
+    return Array.isArray(data) ? data : [];
   } catch (error) {
     console.error('Error fetching category products:', error);
     return [];

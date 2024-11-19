@@ -69,3 +69,38 @@ export async function GET(request: NextRequest) {
     ));
   }
 }
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const apiUrl = `${environment.API_BASE_URL}/v1/products`;
+    
+    const headersList = headers();
+    const authHeader = headersList.get('Authorization');
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(authHeader ? { Authorization: authHeader } : {}),
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API request failed: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    return corsResponse(new NextResponse(JSON.stringify(result), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }));
+  } catch (error) {
+    console.error('Error in products POST:', error);
+    return corsResponse(new NextResponse(
+      JSON.stringify({ error: 'Failed to process product request' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    ));
+  }
+}
