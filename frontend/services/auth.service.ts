@@ -202,20 +202,22 @@ export class AuthService {
     }
   }
 
-  public async login(username: string, password: string): Promise<void> {
+  public async login(email: string, password: string): Promise<void> {
     try {
-      console.log('Attempting login with:', { username });
+      console.log('Login attempt:', { email });
       const response = await this.apiService.request<LoginResponse>(API_ENDPOINTS.AUTH.LOGIN, {
         method: 'POST',
         body: JSON.stringify({
           AuthParameters: {
-            USERNAME: username,
+            USERNAME: email,
             PASSWORD: password
           },
           AuthFlow: "USER_PASSWORD_AUTH",
           ClientId: environment.COGNITO.CLIENT_ID
         }),
       });
+
+      console.log('Login response:', response);
 
       if (response.tokens) {
         this.setTokens(response.tokens);

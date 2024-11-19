@@ -12,7 +12,7 @@ interface AuthContextType {
   username: string | null;
   email: string | null;
   register: (username: string, email: string, password: string, gender: string) => Promise<void>;
-  login: (username: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   verifyEmail: (username: string, code: string) => Promise<void>;
   resendVerificationCode: (username: string) => Promise<void>;
@@ -73,10 +73,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const login = async (username: string, password: string) => {
+  const login = async (email: string, password: string) => {
     try {
       setIsLoading(true);
-      await authService.login(username, password);
+      await authService.login(email, password);
       toast.success('Successfully logged in!');
       router.push('/');
     } catch (error) {

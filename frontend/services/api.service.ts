@@ -85,10 +85,11 @@ export class ApiService {
     }
 
     const fullUrl = this.getFullUrl(url);
-    console.log('Making request to:', fullUrl, {
+    console.log('API Request:', {
+      url: fullUrl,
       method: options.method,
       headers: Object.fromEntries(headers.entries()),
-      body: options.body
+      body: options.body ? JSON.parse(options.body as string) : undefined
     });
 
     const response = await fetch(fullUrl, {
@@ -97,15 +98,24 @@ export class ApiService {
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ message: 'Failed to parse error response' }));
-      console.error('API Error Details:', {
+      const errorText = await response.text();
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { message: errorText || 'Failed to parse error response' };
+      }
+      
+      console.error('API Error:', {
         status: response.status,
         statusText: response.statusText,
         url: fullUrl,
         errorData,
-        requestBody: options.body,
+        errorText,
+        requestBody: options.body ? JSON.parse(options.body as string) : undefined,
         headers: Object.fromEntries(headers.entries())
       });
+      
       throw new Error(
         errorData?.message || `HTTP error! status: ${response.status}`
       );
@@ -116,7 +126,12 @@ export class ApiService {
       return null as T;
     }
 
-    return response.json();
+    const data = await response.json();
+    console.log('API Response:', {
+      url: fullUrl,
+      data
+    });
+    return data;
   }
 
   public async register(data: {
