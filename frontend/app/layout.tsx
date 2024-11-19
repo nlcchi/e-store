@@ -21,7 +21,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+      </head>
+      <body className={`${inter.className} min-h-screen bg-background antialiased`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
@@ -30,9 +33,11 @@ export default function RootLayout({
         >
           <AuthProvider>
             <CartProvider>
-              <Navbar />
-              <main className="min-h-screen bg-background">{children}</main>
-              <Toaster />
+              <div className="relative flex min-h-screen flex-col">
+                <Navbar />
+                <main className="flex-1">{children}</main>
+                <Toaster />
+              </div>
             </CartProvider>
           </AuthProvider>
         </ThemeProvider>
