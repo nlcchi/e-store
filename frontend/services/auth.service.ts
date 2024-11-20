@@ -3,6 +3,8 @@
 import { environment } from '../config/environment';
 import { ApiService } from './api.service';
 import { API_ENDPOINTS } from '@/config/api-endpoints';
+import { CognitoJwtVerifier } from 'aws-jwt-verify';
+import { jwtDecode } from 'jwt-decode';
 
 interface UserClaims {
   sub: string;
@@ -22,18 +24,31 @@ class AuthError extends Error {
 }
 
 export interface AuthTokens {
-  AccessToken: string;
-  IdToken: string;
-  RefreshToken: string;
-  TokenType?: string;
+  AccessToken?: string;
+  IdToken?: string;
+  RefreshToken?: string;
+  ExpiresIn?: number;
 }
 
-export class AuthService {
+export interface TokenClaims {
+  sub: string;
+  email: string;
+  'cognito:groups'?: string[];
+  exp: number;
+}
+
+class AuthService {
   private static instance: AuthService;
   private apiService: ApiService;
+  private tokenVerifier: any;
 
   private constructor() {
     this.apiService = new ApiService();
+    this.tokenVerifier = CognitoJwtVerifier.create({
+      userPoolId: environment.COGNITO.USER_POOL_ID,
+      clientId: environment.COGNITO.CLIENT_ID,
+      tokenUse: 'id',
+    });
   }
 
   public static getInstance(): AuthService {
@@ -464,49 +479,68 @@ export class AuthService {
     return tokens.AccessToken;
   }
 
-  private parseToken(token: string): UserClaims | null {
+  public parseToken(token: string): TokenClaims | null {
     try {
-      const base64Url = token.split('.')[1];
-      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-      const jsonPayload = decodeURIComponent(
-        atob(base64)
-          .split('')
-          .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-          .join('')
-      );
-      
-      const parsedPayload = JSON.parse(jsonPayload);
-      // console.log('Full token payload:', parsedPayload);
-      
-      // Use the correct Cognito group claim name
-      const groups = parsedPayload['cognito:groups'] || [];
-                    
-      return {
-        sub: parsedPayload.sub,
-        email: parsedPayload.email,
-        groups: groups,
-        exp: parsedPayload.exp
-      };
+      return jwtDecode<TokenClaims>(token);
     } catch (error) {
-      console.error('Failed to parse token:', error);
+      console.error('Error parsing token:', error);
       return null;
     }
   }
 
-  public getTokens(): AuthTokens | null {
-    const accessToken = localStorage.getItem('AccessToken');
-    const idToken = localStorage.getItem('IdToken');
-    const refreshToken = localStorage.getItem('RefreshToken');
+  public async verifyToken(token: string): Promise<boolean> {
+    try {
+      await this.tokenVerifier.verify(token);
+      return true;
+    } catch (error) {
+      console.error('Token verification failed:', error);
+      return false;
+    }
+  }
 
-    if (!accessToken || !idToken || !refreshToken) {
+  public isTokenExpired(token: string): boolean {
+    const claims = this.parseToken(token);
+    if (!claims) return true;
+    
+    const currentTime = Math.floor(Date.now() / 1000);
+    return claims.exp < currentTime;
+  }
+
+  public async refreshSession(): Promise<void> {
+    try {
+      const response = await fetch(API_ENDPOINTS.REFRESH_TOKEN, {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Session refresh failed');
+      }
+
+      const data = await response.json();
+      this.setTokens(data.tokens);
+    } catch (error) {
+      console.error('Session refresh error:', error);
+      throw error;
+    }
+  }
+
+  public getTokens(): AuthTokens | null {
+    try {
+      const tokens = localStorage.getItem('tokens');
+      return tokens ? JSON.parse(tokens) : null;
+    } catch (error) {
+      console.error('Error getting tokens:', error);
       return null;
     }
+  }
 
-    return {
-      AccessToken: accessToken,
-      IdToken: idToken,
-      RefreshToken: refreshToken,
-    };
+  public setTokens(tokens: AuthTokens): void {
+    localStorage.setItem('tokens', JSON.stringify(tokens));
+  }
+
+  public clearTokens(): void {
+    localStorage.removeItem('tokens');
   }
 
   public getUserGroup(): string[] {
@@ -531,16 +565,15 @@ export class AuthService {
     return this.hasPermission(environment.COGNITO.USER_GROUPS.MANAGE_PRODUCT);
   }
 
-  private setTokens(tokens: AuthTokens): void {
-    localStorage.setItem('AccessToken', tokens.AccessToken);
-    localStorage.setItem('IdToken', tokens.IdToken);
-    localStorage.setItem('RefreshToken', tokens.RefreshToken);
+  public continueAsGuest(): void {
+    localStorage.setItem('isGuest', 'true');
   }
 
-  private clearTokens(): void {
-    localStorage.removeItem('AccessToken');
-    localStorage.removeItem('IdToken');
-    localStorage.removeItem('RefreshToken');
-    localStorage.removeItem('CognitoSession');
+  public isGuest(): boolean {
+    return localStorage.getItem('isGuest') === 'true';
+  }
+
+  public clearGuestMode(): void {
+    localStorage.removeItem('isGuest');
   }
 }
