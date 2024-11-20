@@ -16,6 +16,8 @@ interface AuthContextType {
   logout: () => Promise<void>;
   verifyEmail: (username: string, code: string) => Promise<void>;
   resendVerificationCode: (username: string) => Promise<void>;
+  isGuest: boolean;
+  continueAsGuest: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -26,6 +28,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
   const [email, setEmail] = useState<string | null>(null);
+  const [isGuest, setIsGuest] = useState(false);
   const router = useRouter();
   const authService = AuthService.getInstance();
 
@@ -35,6 +38,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const checkAuth = () => {
     try {
+      if (localStorage.getItem('isGuest') === 'true') {
+        setIsGuest(true);
+        setIsLoading(false);
+        return;
+      }
+
       const tokens = authService.getTokens();
       if (tokens?.IdToken) {
         const claims = authService.parseToken(tokens.IdToken);
@@ -125,6 +134,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const continueAsGuest = () => {
+    setIsGuest(true);
+    localStorage.setItem('isGuest', 'true');
+    router.push('/checkout');
+  };
+
   const handleAuthError = (error: any) => {
     console.error('Auth error:', error);
     toast.error('Authentication failed. Please try again.');
@@ -141,6 +156,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     logout,
     verifyEmail,
     resendVerificationCode,
+    isGuest,
+    continueAsGuest,
   };
 
   return (

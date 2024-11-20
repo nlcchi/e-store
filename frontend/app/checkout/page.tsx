@@ -62,7 +62,7 @@ export default function CheckoutPage() {
 
   if (state.items.length === 0) {
     return (
-      <ProtectedRoute>
+      <ProtectedRoute allowGuest>
         <div className="container mx-auto px-4 py-8">
           <h1 className="text-2xl font-bold mb-4">Your cart is empty</h1>
           <Button onClick={() => router.push("/")}>Continue Shopping</Button>
@@ -72,7 +72,7 @@ export default function CheckoutPage() {
   }
 
   return (
-    <ProtectedRoute>
+    <ProtectedRoute allowGuest>
       <div className="container mx-auto px-4 py-8">
         <h1 className="text-2xl font-bold mb-8">Checkout</h1>
         <div className="grid md:grid-cols-2 gap-8">
