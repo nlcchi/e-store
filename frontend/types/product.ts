@@ -2,22 +2,13 @@ export interface Product {
   id: string;
   name: string;
   description: string;
-  price: number;
   category: string;
+  price: number;
   stock: number;
-  imageUrl?: string;
-  image_1?: boolean | null;
-  image_2?: boolean | null;
-  image_3?: boolean | null;
-  createdAt: number;
-  updatedAt?: number;
-}
-
-export interface ProductFilters {
-  category?: string;
-  minPrice?: number;
-  maxPrice?: number;
-  search?: string;
+  created: string;
+  image_1?: boolean;
+  image_2?: boolean;
+  image_3?: boolean;
 }
 
 export interface ProductResponse {
@@ -27,4 +18,15 @@ export interface ProductResponse {
       S: string;
     };
   };
+}
+
+export interface ProductFilters {
+  category?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  search?: string;
+  sortBy?: 'created' | 'price' | 'name';
+  sortOrder?: 'asc' | 'desc';
+  page?: number;
+  limit?: number;
 }

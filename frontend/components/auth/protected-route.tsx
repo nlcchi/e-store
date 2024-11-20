@@ -7,18 +7,17 @@ import { Loader2 } from 'lucide-react';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  allowGuest?: boolean;
 }
 
-export function ProtectedRoute({ children, allowGuest = false }: ProtectedRouteProps) {
-  const { isAuthenticated, isLoading, isGuest } = useAuth();
+export function ProtectedRoute({ children }: ProtectedRouteProps) {
+  const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated && !isGuest && !allowGuest) {
+    if (!isLoading && !isAuthenticated) {
       router.push('/login');
     }
-  }, [isLoading, isAuthenticated, isGuest, allowGuest, router]);
+  }, [isLoading, isAuthenticated, router]);
 
   if (isLoading) {
     return (
@@ -28,7 +27,7 @@ export function ProtectedRoute({ children, allowGuest = false }: ProtectedRouteP
     );
   }
 
-  if (!isAuthenticated && !isGuest && !allowGuest) {
+  if (!isAuthenticated) {
     return null;
   }
 

@@ -2,6 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --foreground-rgb: 222.2, 84%, 4.9%;
+  --background-start-rgb: 0, 0%, 100%;
+  --background-end-rgb: 0, 0%, 100%;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 210, 40%, 98%;
+    --background-start-rgb: 222.2, 84%, 4.9%;
+    --background-end-rgb: 222.2, 84%, 4.9%;
+  }
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -25,7 +39,6 @@
     --ring: 222.2 84% 4.9%;
     --radius: 0.5rem;
   }
-
   .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
@@ -51,60 +64,9 @@
 
 @layer base {
   * {
-    @apply border-border;
+    @apply border-[hsl(var(--border))];
   }
   body {
-    @apply min-h-screen bg-background text-foreground antialiased;
-  }
-}
-
-/* Ensure images maintain aspect ratio */
-img {
-  @apply object-cover;
-  aspect-ratio: attr(width) / attr(height);
-}
-
-@layer utilities {
-  .bg-background {
-    background-color: hsl(var(--background));
-  }
-  .text-foreground {
-    color: hsl(var(--foreground));
-  }
-  .border-border {
-    border-color: hsl(var(--border));
-  }
-}
-
-@layer components {
-  .container {
-    @apply mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl;
-  }
-}
-
-@keyframes accordion-down {
-  from {
-    height: 0;
-  }
-  to {
-    height: var(--radix-accordion-content-height);
-  }
-}
-
-@keyframes accordion-up {
-  from {
-    height: var(--radix-accordion-content-height);
-  }
-  to {
-    height: 0;
-  }
-}
-
-@layer utilities {
-  .animate-accordion-down {
-    animation: accordion-down 0.2s ease-out;
-  }
-  .animate-accordion-up {
-    animation: accordion-up 0.2s ease-out;
+    @apply bg-[hsl(var(--background))] text-[hsl(var(--foreground))];
   }
 }

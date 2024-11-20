@@ -1,24 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
-import { Trash2, Upload, Plus, Pencil, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { environment } from "@/config/environment";
-import { API_ENDPOINTS } from "@/config/api-endpoints";
-import { apiService } from "@/services/api.service";
-import { AuthService } from "@/services/auth.service";
 import {
   Table,
   TableBody,
@@ -27,100 +10,182 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { useToast } from "@/components/ui/use-toast";
+import { Loader2, Pencil, Trash2, Upload, Plus } from "lucide-react";
+import { AuthService } from "@/services/auth.service";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { environment } from "@/config/environment";
+import { API_ENDPOINTS } from "@/config/api-endpoints";
 
 interface Product {
   id: string;
   name: string;
   description: string;
   price: number;
-  category: string;
   imageUrl?: string;
-  createdAt?: string;
-  updatedAt?: string;
 }
 
 export default function AdminPage() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
   const authService = AuthService.getInstance();
 
+  // Fetch products
   useEffect(() => {
     fetchProducts();
   }, []);
 
   const fetchProducts = async () => {
     try {
-      setLoading(true);
-      const products = await apiService.listProducts();
-      setProducts(products);
+      const response = await fetch(`${environment.API_BASE_URL}${API_ENDPOINTS.PRODUCTS.LIST}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) throw new Error('Failed to fetch products');
+      
+      const data = await response.json();
+      console.log(data);
+      setProducts(data.queryResult || []);
     } catch (error) {
       console.error('Error fetching products:', error);
-      toast.error('Failed to fetch products');
+      toast({
+        title: "Error",
+        description: "Failed to fetch products. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const handleCreateProduct = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     setLoading(true);
 
-    const formData = new FormData(event.currentTarget);
-
     try {
+      const formData = new FormData(e.currentTarget);
       const productData = {
         name: formData.get('name') as string,
         description: formData.get('description') as string,
         price: parseFloat(formData.get('price') as string),
-        category: formData.get('category') as string || 'general',
       };
 
-      const newProduct = await apiService.createProduct(productData);
+      const accessToken = authService.getAccessToken();
+      const response = await fetch(`${environment.API_BASE_URL}${API_ENDPOINTS.PRODUCTS.CREATE}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(productData),
+      });
+
+      if (!response.ok) throw new Error('Failed to create product');
+
+      const newProduct = await response.json();
       
+      // If there's an image, upload it
       if (imageFile && newProduct.id) {
-        const imageUrl = await handleImageUpload(newProduct.id, imageFile);
-        newProduct.imageUrl = imageUrl;
+        await handleImageUpload(newProduct.id, imageFile);
       }
 
-      toast.success('Product created successfully!');
+      toast({
+        title: "Success",
+        description: "Product created successfully!",
+      });
+
       setIsDialogOpen(false);
-      setProducts([...products, newProduct]);
+      fetchProducts(); // Refresh the product list
     } catch (error) {
       console.error('Error creating product:', error);
-      toast.error('Failed to create product');
+      toast({
+        title: "Error",
+        description: "Failed to create product. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleImageUpload = async (productId: string, file: File): Promise<string> => {
+  const handleImageUpload = async (productId: string, file: File) => {
     try {
-      const authService = AuthService.getInstance();
-      const token = authService.getAccessToken();
-      
-      const result = await apiService.uploadProductImage(productId, file, token);
-      toast.success('Image uploaded successfully');
-      return result.imageUrl;
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const accessToken = authService.getAccessToken();
+      const response = await fetch(
+        `${environment.API_BASE_URL}${API_ENDPOINTS.PRODUCTS.UPLOAD_IMAGE(productId)}`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+          body: formData,
+        }
+      );
+
+      if (!response.ok) throw new Error('Failed to upload image');
+
+      toast({
+        title: "Success",
+        description: "Image uploaded successfully!",
+      });
     } catch (error) {
       console.error('Error uploading image:', error);
-      toast.error('Failed to upload image');
-      throw error;
+      toast({
+        title: "Error",
+        description: "Failed to upload image. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
-  const handleImageDelete = async (productId: string) => {
+  const handleDeleteImage = async (productId: string) => {
     try {
-      await apiService.deleteProductImage(productId);
-      toast.success('Image deleted successfully');
-      const updatedProducts = products.map(p => 
-        p.id === productId ? { ...p, imageUrl: undefined } : p
+      const accessToken = authService.getAccessToken();
+      const response = await fetch(
+        `${environment.API_BASE_URL}${API_ENDPOINTS.PRODUCTS.DELETE_IMAGE(productId)}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+        }
       );
-      setProducts(updatedProducts);
+
+      if (!response.ok) throw new Error('Failed to delete image');
+
+      toast({
+        title: "Success",
+        description: "Image deleted successfully!",
+      });
+
+      fetchProducts(); // Refresh the product list
     } catch (error) {
-      console.error('Image delete error:', error);
-      toast.error('Failed to delete image');
+      console.error('Error deleting image:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete image. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -135,14 +200,14 @@ export default function AdminPage() {
               Add Product
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="sm:max-w-lg bg-white">
             <DialogHeader>
               <DialogTitle>Add New Product</DialogTitle>
               <DialogDescription>
                 Fill in the product details below.
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleCreateProduct} className="space-y-4">
               <div>
                 <Label htmlFor="name">Name</Label>
                 <Input id="name" name="name" required />
@@ -153,30 +218,21 @@ export default function AdminPage() {
               </div>
               <div>
                 <Label htmlFor="price">Price</Label>
-                <Input
-                  id="price"
-                  name="price"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  required
+                <Input 
+                  id="price" 
+                  name="price" 
+                  type="number" 
+                  step="0.01" 
+                  min="0" 
+                  required 
                 />
               </div>
               <div>
-                <Label htmlFor="category">Category</Label>
-                <Input
-                  id="category"
-                  name="category"
-                  placeholder="e.g., Electronics, Clothing, etc."
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="image">Product Image</Label>
-                <Input
-                  id="image"
-                  name="image"
-                  type="file"
+                <Label htmlFor="image">Image</Label>
+                <Input 
+                  id="image" 
+                  name="image" 
+                  type="file" 
                   accept="image/*"
                   onChange={(e) => setImageFile(e.target.files?.[0] || null)}
                 />
@@ -202,7 +258,6 @@ export default function AdminPage() {
               <TableHead>Name</TableHead>
               <TableHead>Description</TableHead>
               <TableHead>Price</TableHead>
-              <TableHead>Category</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -210,25 +265,25 @@ export default function AdminPage() {
             {products.map((product) => (
               <TableRow key={product.id}>
                 <TableCell>
-                  <div className="relative h-20 w-20">
+                  <div className="relative w-16 h-16">
                     {product.imageUrl ? (
                       <>
                         <img
                           src={product.imageUrl}
                           alt={product.name}
-                          className="h-full w-full object-cover rounded-md"
+                          className="w-full h-full object-cover rounded"
                         />
                         <Button
                           variant="destructive"
                           size="icon"
                           className="absolute -top-2 -right-2"
-                          onClick={() => handleImageDelete(product.id)}
+                          onClick={() => handleDeleteImage(product.id)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </>
                     ) : (
-                      <div className="flex h-full w-full items-center justify-center bg-gray-100 rounded-md">
+                      <div className="w-full h-full bg-gray-100 rounded flex items-center justify-center">
                         <Upload className="h-6 w-6 text-gray-400" />
                       </div>
                     )}
@@ -237,7 +292,6 @@ export default function AdminPage() {
                 <TableCell>{product.name}</TableCell>
                 <TableCell>{product.description}</TableCell>
                 <TableCell>${product.price.toFixed(2)}</TableCell>
-                <TableCell>{product.category}</TableCell>
                 <TableCell>
                   <div className="flex space-x-2">
                     <Button variant="outline" size="icon">

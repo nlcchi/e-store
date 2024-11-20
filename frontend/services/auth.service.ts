@@ -1,54 +1,39 @@
 'use client';
 
-import { API_ENDPOINTS } from '@/config/api-endpoints';
-import { environment } from '@/config/environment';
+import { environment } from '../config/environment';
 import { ApiService } from './api.service';
+import { API_ENDPOINTS } from '@/config/api-endpoints';
+
+interface UserClaims {
+  sub: string;
+  email: string;
+  groups: string[];
+  exp: number;
+}
+
+class AuthError extends Error {
+  code?: string;
+
+  constructor(message: string, code?: string) {
+    super(message);
+    this.name = 'AuthError';
+    this.code = code;
+  }
+}
 
 export interface AuthTokens {
   AccessToken: string;
   IdToken: string;
-  RefreshToken?: string;
+  RefreshToken: string;
+  TokenType?: string;
 }
-
-interface LoginResponse {
-  tokens: AuthTokens;
-  username: string;
-  email: string;
-}
-
-interface RegisterResponse {
-  tokens: AuthTokens;
-  username: string;
-  email: string;
-}
-
-interface ProfileResponse {
-  username: string;
-  email: string;
-  groups?: string[];
-}
-
-interface TokenClaims {
-  sub: string;
-  email: string;
-  groups?: string[];
-  exp: number;
-}
-
-const STORAGE_KEY = 'auth-tokens';
 
 export class AuthService {
   private static instance: AuthService;
   private apiService: ApiService;
-  private accessToken: string | null = null;
-  private idToken: string | null = null;
-  private refreshToken: string | null = null;
-  private username: string | null = null;
-  private email: string | null = null;
 
   private constructor() {
-    this.apiService = ApiService.getInstance();
-    this.loadTokens();
+    this.apiService = new ApiService();
   }
 
   public static getInstance(): AuthService {
@@ -58,214 +43,428 @@ export class AuthService {
     return AuthService.instance;
   }
 
-  private loadTokens(): void {
-    if (typeof window === 'undefined') {
-      // Server-side, no tokens available
-      this.accessToken = null;
-      this.refreshToken = null;
-      this.idToken = null;
-      return;
-    }
-
+  public async register(
+    username: string,
+    email: string,
+    password: string,
+    gender: string
+  ): Promise<AuthTokens> {
     try {
-      const tokens = localStorage.getItem(STORAGE_KEY);
-      if (tokens) {
-        const parsed = JSON.parse(tokens);
-        this.accessToken = parsed.accessToken;
-        this.refreshToken = parsed.refreshToken ?? null;
-        this.idToken = parsed.idToken;
+      // Validate inputs
+      if (username.length < 3 || username.includes(' ')) {
+        throw new AuthError('Username must be at least 3 characters and contain no spaces.');
       }
-    } catch (error) {
-      console.error('Failed to load tokens:', error);
-      this.clearTokens();
-    }
-  }
-
-  private setTokens(tokens: AuthTokens): void {
-    if (typeof window === 'undefined') {
-      return; // Don't try to use localStorage on server
-    }
-
-    this.accessToken = tokens.AccessToken;
-    this.refreshToken = tokens.RefreshToken ?? null;
-    this.idToken = tokens.IdToken;
-
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        accessToken: this.accessToken,
-        refreshToken: this.refreshToken,
-        idToken: this.idToken
-      }));
-    } catch (error) {
-      console.error('Failed to save tokens:', error);
-    }
-  }
-
-  private clearTokens(): void {
-    this.accessToken = null;
-    this.refreshToken = null;
-    this.idToken = null;
-
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.removeItem(STORAGE_KEY);
-      } catch (error) {
-        console.error('Failed to clear tokens:', error);
+      
+      if (!['male', 'female'].includes(gender.toLowerCase())) {
+        throw new AuthError('Gender must be either "male" or "female".');
       }
-    }
-  }
 
-  public getAccessToken(): string | null {
-    return this.accessToken;
-  }
+      // Validate password
+      if (password.length < 8) {
+        throw new AuthError('Password must be at least 8 characters long.');
+      }
 
-  public getTokens(): AuthTokens | null {
-    if (!this.accessToken || !this.idToken) return null;
-    return {
-      AccessToken: this.accessToken,
-      IdToken: this.idToken,
-      ...(this.refreshToken ? { RefreshToken: this.refreshToken } : {})
-    };
-  }
+      if (!/[A-Z]/.test(password)) {
+        throw new AuthError('Password must contain at least one uppercase letter.');
+      }
 
-  public async register(data: { 
-    username: string; 
-    email: string; 
-    password: string; 
-    gender: string;
-  }): Promise<RegisterResponse> {
-    try {
-      const response = await this.apiService.request<RegisterResponse>(API_ENDPOINTS.AUTH.REGISTER, {
-        method: 'POST',
-        body: JSON.stringify(data),
+      if (!/[a-z]/.test(password)) {
+        throw new AuthError('Password must contain at least one lowercase letter.');
+      }
+
+      if (!/[0-9]/.test(password)) {
+        throw new AuthError('Password must contain at least one number.');
+      }
+
+      if (!/[@$!%*?&]/.test(password)) {
+        throw new AuthError('Password must contain at least one special character (@$!%*?&).');
+      }
+
+      console.log('Registering user:', { username, email, gender });
+      
+      // Format request according to API requirements
+      const requestBody = {
+        username: username.toLowerCase().trim(),
+        email: email.toLowerCase().trim(),
+        password,
+        gender: gender.toLowerCase(),
+        clientId: environment.COGNITO.CLIENT_ID
+      };
+
+      console.log('Sending registration request:', {
+        ...requestBody,
+        password: '[REDACTED]',
+        clientId: requestBody.clientId
       });
 
-      if (response.tokens) {
-        localStorage.setItem('TempAccessToken', response.tokens.AccessToken);
-        localStorage.setItem('TempIdToken', response.tokens.IdToken);
-        if (response.tokens.RefreshToken) {
-          localStorage.setItem('TempRefreshToken', response.tokens.RefreshToken);
-        }
+      const response = await this.apiService.request(API_ENDPOINTS.AUTH.REGISTER, {
+        method: 'POST',
+        body: JSON.stringify(requestBody),
+      });
+
+      console.log('Raw registration response:', {
+        ...response,
+        tokens: response?.tokens ? {
+          ...response.tokens,
+          AccessToken: '[REDACTED]',
+          IdToken: '[REDACTED]',
+          RefreshToken: '[REDACTED]'
+        } : undefined
+      });
+
+      // Extract tokens from the nested structure
+      const tokens: AuthTokens = {
+        AccessToken: response?.tokens?.AccessToken || response?.tokens?.accessToken || null,
+        IdToken: response?.tokens?.IdToken || response?.tokens?.idToken || null,
+        RefreshToken: response?.tokens?.RefreshToken || response?.tokens?.refreshToken || null,
+        TokenType: response?.tokens?.TokenType || response?.tokens?.tokenType || 'Bearer'
+      };
+
+      // Store session if available
+      if (response?.tokens?.Session || response?.tokens?.session) {
+        localStorage.setItem('TempSession', response?.tokens?.Session || response?.tokens?.session);
+        console.log('Stored TempSession');
       }
 
-      return response;
+      console.log('Registration response structure:', {
+        hasAccessToken: !!tokens.AccessToken,
+        hasIdToken: !!tokens.IdToken,
+        hasRefreshToken: !!tokens.RefreshToken,
+        hasSession: !!(response?.tokens?.Session || response?.tokens?.session),
+        tokenType: tokens.TokenType,
+        responseKeys: Object.keys(response?.tokens || {})
+      });
+
+      // Store temporary tokens for verification
+      if (tokens.AccessToken) {
+        localStorage.setItem('TempAccessToken', tokens.AccessToken);
+        console.log('Stored TempAccessToken');
+      } else {
+        console.warn('No AccessToken found in registration response');
+      }
+      if (tokens.IdToken) {
+        localStorage.setItem('TempIdToken', tokens.IdToken);
+        console.log('Stored TempIdToken');
+      }
+      if (tokens.RefreshToken) {
+        localStorage.setItem('TempRefreshToken', tokens.RefreshToken);
+        console.log('Stored TempRefreshToken');
+      }
+
+      // Don't store permanent tokens yet - they will be stored after email verification
+      return tokens;
+
     } catch (error) {
-      console.error('Registration error:', error);
-      throw error;
-    }
-  }
-
-  public async verifyEmail(username: string, code: string): Promise<void> {
-    try {
-      const tempAccessToken = localStorage.getItem('TempAccessToken');
-      if (!tempAccessToken) {
-        throw new Error('No temporary access token found. Please register again.');
+      console.error('Registration failed:', error);
+      
+      if (error instanceof AuthError) {
+        throw error;
       }
-
-      const response = await this.apiService.request<{ tokens: AuthTokens }>(
-        `${API_ENDPOINTS.AUTH.VERIFY}?code=${code}`,
-        {
-          method: 'POST',
-          token: tempAccessToken,
+      
+      // Handle specific error cases
+      if (error && typeof error === 'object') {
+        // Extract error message
+        let errorMessage = '';
+        if ('message' in error) {
+          errorMessage = String(error.message);
+        } else if ('error' in error) {
+          errorMessage = String(error.error);
         }
-      );
-
-      if (response.tokens) {
-        this.setTokens(response.tokens);
         
-        localStorage.removeItem('TempAccessToken');
-        localStorage.removeItem('TempIdToken');
-        localStorage.removeItem('TempRefreshToken');
-      } else {
-        throw new Error('No tokens received after verification');
+        // Check for specific error conditions
+        const lowerErrorMessage = errorMessage.toLowerCase();
+        if (lowerErrorMessage.includes('email exists') || 
+            lowerErrorMessage.includes('emailexistsexception')) {
+          throw new AuthError('This email is already registered. Please use a different email or try logging in.');
+        } else if (lowerErrorMessage.includes('username exists')) {
+          throw new AuthError('This username is already taken. Please choose a different username.');
+        } else if (lowerErrorMessage.includes('password')) {
+          throw new AuthError('Password must be at least 8 characters long and contain uppercase, lowercase, numbers and special characters.');
+        } else if (lowerErrorMessage.includes('invalid')) {
+          throw new AuthError('Please check your input values and try again.');
+        } else {
+          // If we have an error message, use it
+          if (errorMessage) {
+            throw new AuthError(`Registration failed: ${errorMessage}`);
+          }
+        }
       }
-    } catch (error) {
-      console.error('Email verification error:', error);
-      throw error;
+      
+      // Default error message
+      throw new AuthError(
+        'Registration failed. Please try again.',
+        'REGISTRATION_FAILED'
+      );
     }
   }
 
-  public async resendVerificationCode(username: string): Promise<void> {
+  public async login(email: string, password: string): Promise<UserClaims> {
     try {
-      const tempAccessToken = localStorage.getItem('TempAccessToken');
-      if (!tempAccessToken) {
-        throw new Error('No temporary access token found. Please register again.');
+      console.log('Attempting login with:', { identity: email });
+      
+      // Validate inputs before making request
+      if (!email || !password) {
+        throw new AuthError('Email and password are required');
       }
 
-      await this.apiService.request(API_ENDPOINTS.AUTH.VERIFY, {
-        method: 'POST',
-        token: tempAccessToken,
+      const response = await this.apiService.login({ 
+        identity: email.trim().toLowerCase(),
+        password 
       });
-    } catch (error) {
-      console.error('Failed to resend verification code:', error);
-      throw error;
-    }
-  }
-
-  public async login(email: string, password: string): Promise<void> {
-    try {
-      console.log('Login attempt:', { email });
-      const response = await this.apiService.request<LoginResponse>(API_ENDPOINTS.AUTH.LOGIN, {
-        method: 'POST',
-        body: JSON.stringify({
-          AuthParameters: {
-            USERNAME: email,
-            PASSWORD: password
-          },
-          AuthFlow: "USER_PASSWORD_AUTH",
-          ClientId: environment.COGNITO.CLIENT_ID
-        }),
+      
+      console.log('Login response:', {
+        hasTokens: !!response?.tokens,
+        tokenKeys: response?.tokens ? Object.keys(response.tokens) : [],
       });
 
-      console.log('Login response:', response);
-
-      if (response.tokens) {
-        this.setTokens(response.tokens);
-        this.username = response.username;
-        this.email = response.email;
-      } else {
-        throw new Error('No tokens received');
+      if (!response || !response.tokens) {
+        console.error('Invalid login response:', response);
+        throw new AuthError('Invalid response from server');
       }
+
+      if (!this.validateTokenResponse(response.tokens)) {
+        console.error('Invalid token response:', response.tokens);
+        throw new AuthError('Invalid token response from server');
+      }
+
+      // Parse and log token information before storing
+      const idTokenClaims = this.parseToken(response.tokens.IdToken);
+      if (!idTokenClaims) {
+        throw new AuthError('Failed to parse ID token');
+      }
+
+      console.log('Token claims:', {
+        sub: idTokenClaims.sub,
+        groups: idTokenClaims.groups,
+        exp: idTokenClaims.exp
+      });
+
+      this.setTokens(response.tokens);
+      
+      // Verify tokens were stored
+      const storedTokens = this.getTokens();
+      console.log('Stored tokens verification:', {
+        hasAccessToken: !!storedTokens?.AccessToken,
+        hasIdToken: !!storedTokens?.IdToken,
+        hasRefreshToken: !!storedTokens?.RefreshToken,
+        groups: this.getUserGroup()
+      });
+
+      return idTokenClaims;
     } catch (error) {
-      console.error('Login error:', error);
-      throw error;
+      console.error('Login failed:', error);
+      
+      // Provide more specific error messages
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        throw new AuthError('Unable to connect to authentication service. Please check your internet connection.', 'NETWORK_ERROR');
+      }
+      
+      const message = error instanceof Error ? error.message : 'Login failed';
+      throw new AuthError(message, error instanceof AuthError ? error.code : 'LOGIN_FAILED');
     }
   }
 
   public async logout(): Promise<void> {
     try {
+      await this.apiService.logout();
       this.clearTokens();
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error('Logout failed:', error);
       throw error;
     }
   }
 
-  public async getProfile(): Promise<ProfileResponse> {
+  public async refreshTokens(): Promise<void> {
     try {
-      return await this.apiService.request<ProfileResponse>(API_ENDPOINTS.AUTH.PROFILE, {
-        method: 'GET',
-        token: this.getAccessToken(),
-      });
+      const refreshToken = localStorage.getItem('RefreshToken');
+      if (!refreshToken) {
+        throw new AuthError('No refresh token available', 'NO_REFRESH_TOKEN');
+      }
+      
+      const response = await this.apiService.refreshToken(refreshToken);
+      if (!this.validateTokenResponse(response)) {
+        throw new AuthError('Invalid token response from server');
+      }
+      this.setTokens(response);
     } catch (error) {
-      console.error('Get profile error:', error);
-      throw error;
+      console.error('Token refresh failed:', error);
+      this.clearTokens(); // Clear invalid tokens
+      throw new AuthError(
+        error instanceof Error ? error.message : 'Token refresh failed',
+        'REFRESH_FAILED'
+      );
     }
   }
 
-  public isAuthenticated(): boolean {
-    return !!this.accessToken;
+  public async verifyEmail(username: string, code: string): Promise<void> {
+    try {
+      console.log('Verifying email for user:', username);
+
+      // Get the temporary tokens
+      const tempAccessToken = localStorage.getItem('TempAccessToken');
+      
+      if (!tempAccessToken) {
+        throw new AuthError('No access token found. Please register again.');
+      }
+
+      console.log('Sending verification request with code:', code);
+
+      // Backend expects code as query parameter
+      const response = await this.apiService.request(`${API_ENDPOINTS.AUTH.VERIFY}?code=${code}`, {
+        method: 'POST',
+        credentials: 'include',  // Important for cookies
+        headers: {
+          'Cookie': `AccessToken=${tempAccessToken}` // Send token as cookie
+        }
+      });
+
+      console.log('Email verification response:', {
+        success: !!response,
+        username,
+        hasTokens: !!response?.tokens
+      });
+
+      if (!response) {
+        throw new AuthError('Email verification failed. Please try again.');
+      }
+
+      // After successful verification, store the tokens
+      if (response.tokens) {
+        const tokens: AuthTokens = {
+          AccessToken: response.tokens.AccessToken,
+          IdToken: response.tokens.IdToken,
+          RefreshToken: response.tokens.RefreshToken,
+          TokenType: response.tokens.TokenType
+        };
+
+        // Store the tokens
+        localStorage.setItem('AccessToken', tokens.AccessToken);
+        localStorage.setItem('IdToken', tokens.IdToken);
+        if (tokens.RefreshToken) {
+          localStorage.setItem('RefreshToken', tokens.RefreshToken);
+        }
+
+        // Clean up temporary tokens
+        localStorage.removeItem('TempAccessToken');
+        localStorage.removeItem('TempIdToken');
+        localStorage.removeItem('TempRefreshToken');
+      }
+    } catch (error) {
+      console.error('Email verification failed:', error);
+      
+      if (error instanceof AuthError) {
+        throw error;
+      }
+
+      if (error && typeof error === 'object') {
+        let errorMessage = '';
+        if ('message' in error) {
+          errorMessage = String(error.message);
+        } else if ('error' in error) {
+          errorMessage = String(error.error);
+        }
+
+        const lowerErrorMessage = errorMessage.toLowerCase();
+        if (lowerErrorMessage.includes('expired')) {
+          throw new AuthError('Verification code has expired. Please request a new code.');
+        } else if (lowerErrorMessage.includes('invalid') && lowerErrorMessage.includes('code')) {
+          throw new AuthError('Invalid verification code. Please try again or request a new code.');
+        } else if (lowerErrorMessage.includes('not found')) {
+          throw new AuthError('User not found. Please register again.');
+        } else if (errorMessage) {
+          throw new AuthError(`Email verification failed: ${errorMessage}`);
+        }
+      }
+
+      throw new AuthError('Email verification failed. Please try again.');
+    }
   }
 
-  public getUsername(): string | null {
-    return this.username;
+  public async resendVerificationCode(username: string): Promise<void> {
+    try {
+      console.log('Requesting new verification code for:', username);
+
+      // Get the temporary access token
+      const tempAccessToken = localStorage.getItem('TempAccessToken');
+      if (!tempAccessToken) {
+        throw new AuthError('No access token found. Please register again.');
+      }
+
+      const response = await this.apiService.request(API_ENDPOINTS.AUTH.VERIFY, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${tempAccessToken}`
+        }
+      });
+
+      console.log('New verification code requested successfully');
+
+      if (!response) {
+        throw new AuthError('Failed to request new verification code.');
+      }
+    } catch (error) {
+      console.error('Failed to request new verification code:', error);
+      
+      if (error instanceof AuthError) {
+        throw error;
+      }
+
+      if (error && typeof error === 'object') {
+        let errorMessage = '';
+        if ('message' in error) {
+          errorMessage = String(error.message);
+        } else if ('error' in error) {
+          errorMessage = String(error.error);
+        }
+
+        const lowerErrorMessage = errorMessage.toLowerCase();
+        if (lowerErrorMessage.includes('not found')) {
+          throw new AuthError('User not found. Please register again.');
+        } else if (errorMessage) {
+          throw new AuthError(`Failed to request new code: ${errorMessage}`);
+        }
+      }
+
+      throw new AuthError('Failed to request new verification code. Please try again.');
+    }
   }
 
-  public getEmail(): string | null {
-    return this.email;
+  private validateTokenResponse(tokens: unknown): tokens is AuthTokens {
+    return (
+      typeof tokens === 'object' &&
+      tokens !== null &&
+      'AccessToken' in tokens &&
+      'IdToken' in tokens &&
+      'RefreshToken' in tokens &&
+      typeof tokens.AccessToken === 'string' &&
+      typeof tokens.IdToken === 'string' &&
+      typeof tokens.RefreshToken === 'string'
+    );
   }
 
-  public parseToken(token: string): TokenClaims | null {
+  public getAccessToken(): string | null {
+    const tokens = this.getTokens();
+    if (!tokens?.AccessToken) {
+      console.warn('No access token found');
+      return null;
+    }
+    
+    // Validate token expiration
+    try {
+      const claims = this.parseToken(tokens.AccessToken);
+      if (!claims || claims.exp * 1000 < Date.now()) {
+        console.warn('Access token expired');
+        return null;
+      }
+    } catch (error) {
+      console.error('Failed to validate access token:', error);
+      return null;
+    }
+    
+    return tokens.AccessToken;
+  }
+
+  private parseToken(token: string): UserClaims | null {
     try {
       const base64Url = token.split('.')[1];
       const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
@@ -275,26 +474,73 @@ export class AuthService {
           .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
           .join('')
       );
-      return JSON.parse(jsonPayload);
+      
+      const parsedPayload = JSON.parse(jsonPayload);
+      // console.log('Full token payload:', parsedPayload);
+      
+      // Use the correct Cognito group claim name
+      const groups = parsedPayload['cognito:groups'] || [];
+                    
+      return {
+        sub: parsedPayload.sub,
+        email: parsedPayload.email,
+        groups: groups,
+        exp: parsedPayload.exp
+      };
     } catch (error) {
-      console.error('Error parsing token:', error);
+      console.error('Failed to parse token:', error);
       return null;
     }
   }
 
+  public getTokens(): AuthTokens | null {
+    const accessToken = localStorage.getItem('AccessToken');
+    const idToken = localStorage.getItem('IdToken');
+    const refreshToken = localStorage.getItem('RefreshToken');
+
+    if (!accessToken || !idToken || !refreshToken) {
+      return null;
+    }
+
+    return {
+      AccessToken: accessToken,
+      IdToken: idToken,
+      RefreshToken: refreshToken,
+    };
+  }
+
+  public getUserGroup(): string[] {
+    const token = localStorage.getItem('IdToken');
+    if (!token) return [];
+
+    const claims = this.parseToken(token);
+    // console.log('getUserGroup claims:', claims);
+    return claims?.groups || [];
+  }
+
+  public hasPermission(requiredGroup: string): boolean {
+    const userGroups = this.getUserGroup();
+    return userGroups.includes(requiredGroup);
+  }
+
   public isAdmin(): boolean {
-    if (!this.idToken) return false;
-    const claims = this.parseToken(this.idToken);
-    return claims?.groups?.includes(environment.COGNITO.USER_GROUPS.ADMIN) || false;
+    return this.hasPermission(environment.COGNITO.USER_GROUPS.ADMIN);
   }
 
   public canManageProducts(): boolean {
-    if (!this.idToken) return false;
-    const claims = this.parseToken(this.idToken);
-    return (
-      claims?.groups?.includes(environment.COGNITO.USER_GROUPS.MANAGE_PRODUCT) ||
-      this.isAdmin() ||
-      false
-    );
+    return this.hasPermission(environment.COGNITO.USER_GROUPS.MANAGE_PRODUCT);
+  }
+
+  private setTokens(tokens: AuthTokens): void {
+    localStorage.setItem('AccessToken', tokens.AccessToken);
+    localStorage.setItem('IdToken', tokens.IdToken);
+    localStorage.setItem('RefreshToken', tokens.RefreshToken);
+  }
+
+  private clearTokens(): void {
+    localStorage.removeItem('AccessToken');
+    localStorage.removeItem('IdToken');
+    localStorage.removeItem('RefreshToken');
+    localStorage.removeItem('CognitoSession');
   }
 }

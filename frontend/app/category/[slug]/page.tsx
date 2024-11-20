@@ -1,5 +1,7 @@
+import axios from "axios";
 import { notFound } from "next/navigation";
 import ProductGrid from "@/components/product-grid";
+import { environment } from '@/config/environment';
 import { Product } from '@/types/product';
 
 const categories = [
@@ -23,33 +25,27 @@ export function generateStaticParams() {
 
 async function getCategoryProducts(category: string): Promise<Product[]> {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_VERCEL_URL 
-      ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` 
-      : '';
-    
-    const formattedCategory = category
-      .split("-")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" & ")
-      .replace('And', '&');
-
-    const url = new URL(`${baseUrl}/api/products`);
-    url.searchParams.append('category', formattedCategory);
-
-    const response = await fetch(url.toString(), {
-      method: 'GET',
+    const response = await axios.post(`${environment.API_BASE_URL}/v1/products`, null, {
+      params: {
+        category: category
+          .split("-")
+          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(" & ")
+          .replace('And', '&'),
+      },
       headers: {
         'Content-Type': 'application/json',
       },
-      next: { revalidate: 3600 }, // Cache for 1 hour
     });
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch category products: ${response.statusText}`);
+    const data = response.data;
+
+    if (!data.queryResult || !Array.isArray(data.queryResult)) {
+      console.error('Invalid products response format');
+      return [];
     }
 
-    const data = await response.json();
-    return Array.isArray(data) ? data : [];
+    return data.queryResult;
   } catch (error) {
     console.error('Error fetching category products:', error);
     return [];

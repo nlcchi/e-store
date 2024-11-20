@@ -50,7 +50,7 @@ export function CartSheet() {
               {state.items.map((item) => (
                 <div key={item.id} className="flex gap-4">
                   <img
-                    src={item.image}
+                    src={`https://bucket-product-images-1731911956256.s3.ap-southeast-1.amazonaws.com/${item.id}/1.jpg`}
                     alt={item.name}
                     className="h-20 w-20 rounded-lg object-cover"
                   />

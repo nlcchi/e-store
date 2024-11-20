@@ -1,23 +1,20 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { AuthService } from '@/services/auth.service';
+import { environment } from '@/config/environment';
 import { toast } from 'sonner';
 
 interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
-  isAdmin: boolean;
   username: string | null;
-  email: string | null;
   register: (username: string, email: string, password: string, gender: string) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   verifyEmail: (username: string, code: string) => Promise<void>;
   resendVerificationCode: (username: string) => Promise<void>;
-  isGuest: boolean;
-  continueAsGuest: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -25,146 +22,221 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
-  const [email, setEmail] = useState<string | null>(null);
-  const [isGuest, setIsGuest] = useState(false);
   const router = useRouter();
   const authService = AuthService.getInstance();
 
+  // Check authentication status on mount
   useEffect(() => {
+    const checkAuth = () => {
+      try {
+        const tokens = authService.getTokens();
+        if (tokens?.IdToken) {
+          const claims = authService.parseToken(tokens.IdToken);
+          if (claims) {
+            setIsAuthenticated(true);
+            setUsername(claims.email);
+            
+            // Check if user has admin access
+            const userGroups = authService.getUserGroup();
+            const isAdmin = userGroups.includes(environment.COGNITO.USER_GROUPS.ADMIN);
+            const canManageProducts = userGroups.includes(environment.COGNITO.USER_GROUPS.MANAGE_PRODUCT);
+            
+            console.log('Auth state initialized:', {
+              isAuthenticated: true,
+              email: claims.email,
+              groups: userGroups,
+              isAdmin,
+              canManageProducts
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error checking auth state:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
     checkAuth();
   }, []);
 
-  const checkAuth = () => {
-    try {
-      if (localStorage.getItem('isGuest') === 'true') {
-        setIsGuest(true);
-        setIsLoading(false);
-        return;
-      }
-
-      const tokens = authService.getTokens();
-      if (tokens?.IdToken) {
-        const claims = authService.parseToken(tokens.IdToken);
-        if (claims) {
-          setIsAuthenticated(true);
-          setIsAdmin(authService.isAdmin());
-          setUsername(authService.getUsername());
-          setEmail(authService.getEmail());
-          setIsLoading(false);
-          return;
-        }
-      }
-      setIsAuthenticated(false);
-      setIsAdmin(false);
-      setUsername(null);
-      setEmail(null);
-      setIsLoading(false);
-    } catch (error) {
-      console.error('Auth check failed:', error);
-      setIsAuthenticated(false);
-      setIsAdmin(false);
-      setUsername(null);
-      setEmail(null);
-      setIsLoading(false);
-    }
-  };
-
-  const register = async (username: string, email: string, password: string, gender: string) => {
-    try {
-      const response = await authService.register({ username, email, password, gender });
-      toast.success('Registration successful! Please check your email for verification code.');
-      router.push(`/verify?username=${encodeURIComponent(username)}`);
-    } catch (error) {
-      handleAuthError(error);
-      throw error;
-    }
-  };
-
-  const login = async (email: string, password: string) => {
-    try {
+  const register = useCallback(
+    async (username: string, email: string, password: string, gender: string) => {
       setIsLoading(true);
-      await authService.login(email, password);
-      toast.success('Successfully logged in!');
-      router.push('/');
+      try {
+        console.log('Starting registration process...');
+        const response = await authService.register(username, email, password, gender);
+        
+        console.log('Registration response received:', {
+          hasAccessToken: !!response?.AccessToken,
+          hasIdToken: !!response?.IdToken,
+          hasRefreshToken: !!response?.RefreshToken,
+          tokenType: response?.TokenType
+        });
+
+        if (response?.AccessToken && response?.IdToken) {
+          // Store username for the verification step
+          setUsername(username);
+          
+          // Store temporary tokens for verification
+          localStorage.setItem('TempAccessToken', response.AccessToken);
+          localStorage.setItem('TempIdToken', response.IdToken);
+          localStorage.setItem('TempRefreshToken', response.RefreshToken);
+          
+          // Success message and redirect to verification
+          toast.success('Registration successful! Please verify your email to continue.');
+          router.push(`/verify?username=${encodeURIComponent(username)}`);
+        } else {
+          console.error('Missing required tokens in registration response');
+          toast.error('Registration failed: Authentication tokens not received');
+          throw new Error('Registration failed: Authentication tokens not received');
+        }
+      } catch (error) {
+        console.error('Registration error:', error);
+        if (error instanceof Error) {
+          toast.error(error.message);
+        } else {
+          toast.error('Registration failed. Please try again.');
+        }
+        throw error;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [router]
+  );
+
+  const login = useCallback(
+    async (email: string, password: string) => {
+      setIsLoading(true);
+      try {
+        const userClaims = await authService.login(email, password);
+        setIsAuthenticated(true);
+        setUsername(userClaims.email);
+        toast.success('Login successful!');
+        
+        // Check if user has admin access
+        const userGroups = authService.getUserGroup();
+        const isAdmin = userGroups.includes(environment.COGNITO.USER_GROUPS.ADMIN);
+        const canManageProducts = userGroups.includes(environment.COGNITO.USER_GROUPS.MANAGE_PRODUCT);
+        
+        // Redirect based on user role
+        if (isAdmin || canManageProducts) {
+          router.push('/admin');
+        } else {
+          router.push('/');
+        }
+      } catch (error) {
+        console.error('Login error:', error);
+        if (error instanceof Error) {
+          toast.error(error.message);
+        } else {
+          toast.error('Login failed. Please try again.');
+        }
+        throw error;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [router]
+  );
+
+  const logout = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      await authService.logout();
+      setIsAuthenticated(false);
+      setUsername(null);
+      toast.success('Logged out successfully');
+      router.push('/login');
     } catch (error) {
-      console.error('Login error:', error);
-      toast.error('Failed to login. Please check your credentials.');
+      console.error('Logout error:', error);
+      if (error instanceof Error) {
+        toast.error(error.message);
+      } else {
+        toast.error('Logout failed. Please try again.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, [router]);
+
+  const verifyEmail = useCallback(
+    async (username: string, code: string) => {
+      setIsLoading(true);
+      try {
+        await authService.verifyEmail(username, code);
+        
+        // After successful verification, move temporary tokens to permanent storage
+        const tempAccessToken = localStorage.getItem('TempAccessToken');
+        const tempIdToken = localStorage.getItem('TempIdToken');
+        const tempRefreshToken = localStorage.getItem('TempRefreshToken');
+        
+        if (tempAccessToken && tempIdToken) {
+          localStorage.setItem('AccessToken', tempAccessToken);
+          localStorage.setItem('IdToken', tempIdToken);
+          if (tempRefreshToken) {
+            localStorage.setItem('RefreshToken', tempRefreshToken);
+          }
+          
+          // Clear temporary tokens
+          localStorage.removeItem('TempAccessToken');
+          localStorage.removeItem('TempIdToken');
+          localStorage.removeItem('TempRefreshToken');
+          
+          setIsAuthenticated(true);
+          toast.success('Email verified successfully! You are now logged in.');
+          router.push('/');
+        } else {
+          toast.error('Verification failed: Missing authentication tokens');
+          router.push('/login');
+        }
+      } catch (error) {
+        console.error('Email verification error:', error);
+        if (error instanceof Error) {
+          toast.error(error.message);
+        } else {
+          toast.error('Email verification failed. Please try again.');
+        }
+        throw error;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [router]
+  );
+
+  const resendVerificationCode = useCallback(async (username: string) => {
+    setIsLoading(true);
+    try {
+      await authService.resendVerificationCode(username);
+      toast.success('Verification code sent! Please check your email.');
+    } catch (error) {
+      console.error('Resend code error:', error);
+      if (error instanceof Error) {
+        toast.error(error.message);
+      } else {
+        toast.error('Failed to resend code. Please try again.');
+      }
       throw error;
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const logout = async () => {
-    try {
-      await authService.logout();
-      setIsAuthenticated(false);
-      setIsAdmin(false);
-      setUsername(null);
-      setEmail(null);
-      setIsLoading(false);
-      toast.success('Logged out successfully');
-      router.push('/login');
-    } catch (error) {
-      handleAuthError(error);
-      throw error;
-    }
-  };
-
-  const verifyEmail = async (username: string, code: string) => {
-    try {
-      await authService.verifyEmail(username, code);
-      toast.success('Email verified successfully! You can now log in.');
-      router.push('/login');
-    } catch (error) {
-      handleAuthError(error);
-      throw error;
-    }
-  };
-
-  const resendVerificationCode = async (username: string) => {
-    try {
-      await authService.resendVerificationCode(username);
-      toast.success('Verification code resent. Please check your email.');
-    } catch (error) {
-      handleAuthError(error);
-      throw error;
-    }
-  };
-
-  const continueAsGuest = () => {
-    setIsGuest(true);
-    localStorage.setItem('isGuest', 'true');
-    router.push('/checkout');
-  };
-
-  const handleAuthError = (error: any) => {
-    console.error('Auth error:', error);
-    toast.error('Authentication failed. Please try again.');
-  };
+  }, []);
 
   const value = {
     isAuthenticated,
     isLoading,
-    isAdmin,
     username,
-    email,
     register,
     login,
     logout,
     verifyEmail,
     resendVerificationCode,
-    isGuest,
-    continueAsGuest,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
