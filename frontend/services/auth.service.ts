@@ -1,9 +1,7 @@
 'use client';
 
 import { environment } from '../config/environment';
-import { ApiService } from './api.service';
 import { API_ENDPOINTS } from '@/config/api-endpoints';
-import { CognitoJwtVerifier } from 'aws-jwt-verify';
 import { jwtDecode } from 'jwt-decode';
 
 interface UserClaims {
@@ -39,17 +37,8 @@ export interface TokenClaims {
 
 class AuthService {
   private static instance: AuthService;
-  private apiService: ApiService;
-  private tokenVerifier: any;
 
-  private constructor() {
-    this.apiService = new ApiService();
-    this.tokenVerifier = CognitoJwtVerifier.create({
-      userPoolId: environment.COGNITO.USER_POOL_ID,
-      clientId: environment.COGNITO.CLIENT_ID,
-      tokenUse: 'id',
-    });
-  }
+  private constructor() {}
 
   public static getInstance(): AuthService {
     if (!AuthService.instance) {
@@ -112,8 +101,11 @@ class AuthService {
         clientId: requestBody.clientId
       });
 
-      const response = await this.apiService.request(API_ENDPOINTS.AUTH.REGISTER, {
+      const response = await fetch(API_ENDPOINTS.AUTH.REGISTER, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(requestBody),
       });
 
@@ -222,11 +214,15 @@ class AuthService {
         throw new AuthError('Email and password are required');
       }
 
-      const response = await this.apiService.login({ 
-        identity: email.trim().toLowerCase(),
-        password 
+      const response = await fetch(API_ENDPOINTS.AUTH.LOGIN, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+        credentials: 'include',
       });
-      
+
       console.log('Login response:', {
         hasTokens: !!response?.tokens,
         tokenKeys: response?.tokens ? Object.keys(response.tokens) : [],
@@ -281,10 +277,14 @@ class AuthService {
 
   public async logout(): Promise<void> {
     try {
-      await this.apiService.logout();
+      await fetch(API_ENDPOINTS.AUTH.LOGOUT, {
+        method: 'POST',
+        credentials: 'include',
+      });
       this.clearTokens();
+      this.clearGuestMode();
     } catch (error) {
-      console.error('Logout failed:', error);
+      console.error('Logout error:', error);
       throw error;
     }
   }
@@ -296,7 +296,14 @@ class AuthService {
         throw new AuthError('No refresh token available', 'NO_REFRESH_TOKEN');
       }
       
-      const response = await this.apiService.refreshToken(refreshToken);
+      const response = await fetch(API_ENDPOINTS.AUTH.REFRESH_TOKEN, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ refreshToken }),
+      });
+
       if (!this.validateTokenResponse(response)) {
         throw new AuthError('Invalid token response from server');
       }
@@ -325,7 +332,7 @@ class AuthService {
       console.log('Sending verification request with code:', code);
 
       // Backend expects code as query parameter
-      const response = await this.apiService.request(`${API_ENDPOINTS.AUTH.VERIFY}?code=${code}`, {
+      const response = await fetch(`${API_ENDPOINTS.AUTH.VERIFY}?code=${code}`, {
         method: 'POST',
         credentials: 'include',  // Important for cookies
         headers: {
@@ -405,7 +412,7 @@ class AuthService {
         throw new AuthError('No access token found. Please register again.');
       }
 
-      const response = await this.apiService.request(API_ENDPOINTS.AUTH.VERIFY, {
+      const response = await fetch(API_ENDPOINTS.AUTH.VERIFY, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${tempAccessToken}`
@@ -488,16 +495,6 @@ class AuthService {
     }
   }
 
-  public async verifyToken(token: string): Promise<boolean> {
-    try {
-      await this.tokenVerifier.verify(token);
-      return true;
-    } catch (error) {
-      console.error('Token verification failed:', error);
-      return false;
-    }
-  }
-
   public isTokenExpired(token: string): boolean {
     const claims = this.parseToken(token);
     if (!claims) return true;
@@ -577,3 +574,5 @@ class AuthService {
     localStorage.removeItem('isGuest');
   }
 }
+
+export const authService = AuthService.getInstance();
